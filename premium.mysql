@@ -1,0 +1,8 @@
+-- $Id$
+
+CREATE TABLE premium (
+  nid               INT NOT NULL,
+  start_ts          INT,
+  end_ts            INT,
+  PRIMARY KEY(nid)
+);

@@ -1,0 +1,206 @@
+<?php /* $Id$ */
+/**
+ * @file Restrict access to the full body of premium content
+ */
+ 
+/**
+ * Implementation of hook_help()
+ */
+function premium_help($section) {
+  switch($section) {
+    
+    case 'admin/modules#description' :
+      return t('Restrict access to premium content');
+      
+    default :
+      return;
+  }
+}
+
+/**
+ * Implementation of hook_perm()
+ */
+function premium_perm() {
+  return array('access premium content');
+}
+
+/**
+ * Implementation of hook_settings()
+ */
+function premium_settings() {
+  $form = array();
+  
+  // timeframe for premium + update existing nodes
+  $form['premium_mode'] = array(
+    '#type'          => 'radios', 
+    '#title'         => t('Mode'), 
+    '#default_value' => variable_get('premium_mode', '0'), 
+    '#options'       => array(
+      '0' => t('Premium items stay premium indefinitely'), 
+      'archive' => t('Protect archives only: Items switch to premium status after a specified period'), 
+      'latest' => t('Protect latest content only: Items switch to non-premium status after a specified period'), 
+    ),
+  );
+  
+  $form['premium_time_count'] = array(
+    '#type'          => 'select', 
+    '#title'         => t('Count'), 
+    '#default_value' => variable_get('premium_time_count', '2'), 
+    '#options'       => array(1=>1, 2=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 8=>8, 9=>9, 
+      10=>10, 11=>11, 12=>12, 13=>13, 14=>14, 15=>15), 
+  );
+  
+  $form['premium_time_unit'] = array(
+    '#type'          => 'select', 
+    '#title'         => t('Unit'), 
+    '#default_value' => variable_get('premium_time_unit', 'W'), 
+    '#options'       => array('D' => t('Days'), 
+    		'W' => t('Weeks'), 
+    		'M' => t('Months'), 
+    		'Y' => t('Years')), 
+  );
+  
+  $form['premium_message'] = array(
+    '#type'          => 'textarea', 
+    '#title'         => t('Premium body text'), 
+    '#default_value' => variable_get('premium_message', t('Full text available to premium subscribers only')), 
+    '#cols'          => 60, 
+    '#rows'          => 30, 
+    '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
+  );
+  
+  return $form;
+}
+
+/**
+ * Implementation of hook_cron()
+ */
+function premium_cron() {
+  db_query('DELETE FROM {premium} WHERE start_ts < NOW() AND end_ts != 0 AND end_ts > NOW()');
+}
+
+/**
+ * Implementation of hook_nodeapi()
+ */
+function premium_nodeapi(&$node, $op, $teaser, $page) {
+  $start_ts = $node->created;
+  $end_ts   = 0;
+  switch ($op) {
+    
+    case 'delete':
+      db_query('DELETE FROM {premium} WHERE nid=%d', $node->nid);
+      return;
+      
+    case 'insert':
+      if ($node->premium) {
+        _premium_offset($start_ts, $end_ts);
+        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) VALUES ( %d, %d, %d )'
+          , $node->nid, $start_ts, $end_ts);
+      }
+      return;
+      
+    case 'update':
+      if (!$node->nid) return;
+      
+      db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
+      
+      if ($node->premium) {
+        _premium_offset($start_ts, $end_ts);
+        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) VALUES ( %d, %d, %d )'
+          , $node->nid, $start_ts, $end_ts);
+      }
+      return;
+      
+    case 'load':
+      $premium = (int) db_result(db_query('SELECT 1 FROM {premium} 
+    			WHERE nid = %d 
+    			AND ( start_ts > NOW() OR start_ts = 0 )
+    			AND ( end_ts < NOW() OR end_ts = 0 )', $node->nid));
+      return array('premium' => $premium);
+      
+    case 'view':
+      global $user;
+      if (!$node->premium || user_access('access premium content')) {
+		    return;                  // not premium content or user has privileges
+		  }
+      if ($teaser || !$node->body || $node->body == $node->teaser) {
+        return;                  // not viewing the body
+      }
+      foreach (module_implements('premium_access') as $name) {
+        $function = $name.'_premium_access';
+        if ($function($user, $node)) {
+          return;              // access granted explicitly
+        }
+      }
+  
+      $node->body = theme('premium_body', $node->teaser);
+      return;
+  }
+  return;
+} 
+
+/**
+ * Implementation of hook_form_alter()
+ * 
+ * Add the Premium checkbox to the node editing options and default settings
+ * The Premium flag will behave like other options (published, promote, etc)
+ */
+function premium_form_alter($form_id, &$form) {
+  $type = $form['type']['#value'];
+  
+  switch ($form_id) {
+    
+    case $type.'_node_settings':
+      $form['workflow']["node_options_$type"]['premium'] = array(
+        '#type'      		=> 'checkbox',
+        '#title'         => t('Access restricted for non-premium users'),
+        '#weight'        => 9,
+        '#default_value' => (int) in_array('premium', variable_get("node_options_{$type}",array())),
+      );
+      return;
+      
+    case $type.'_node_form':
+      $node = $form['#node'];
+      $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
+      $form['options']['premium'] = array(
+        '#type'      		=> 'checkbox',
+        '#title'         => t('Access restricted for non-premium users'),
+        '#default_value' => $premium,
+      );
+      return;
+  }
+}
+
+/**
+ * Calculate time offset for auto-aging / auto-archiving
+ */
+function _premium_offset(&$start_ts, &$end_ts) {
+  $c = variable_get('premium_time_count',2);
+  $u = variable_get('premium_time_unit','W');
+  $s = $start_ts;
+  
+  switch ( variable_get('premium_mode', 0) ) {
+    
+    case 'archive' :             // public first, premium after awhile
+      $start_ts = mktime(date('H',$s)+($u=='H')*$c, 0, 0, date('m',$s)+($u=='M')*$c,
+        date('d',$s)+($u=='D')*$c+($u=='W')*$c*7, date('y',$s)+($u=='Y')*$c);
+      $end_ts   = 0;
+      return;
+    
+    case 'latest' :             // premium at first, ages to general availability
+      $end_ts   = mktime(date('H',$s)+($u=='H')*$c, 0, 0, date('m',$s)+($u=='M')*$c,
+        date('d',$s)+($u=='D')*$c+($u=='W')*$c*7, date('y',$s)+($u=='Y')*$c);
+      $start_ts = 0;
+      return;
+    
+    default :
+      return;
+  }
+}
+
+/**
+ * Reformat the message body with a premium content message
+ */
+function theme_premium_body($teaser) {
+  return $teaser . '<br />'.variable_get('premium_message',kk1G);
+}
