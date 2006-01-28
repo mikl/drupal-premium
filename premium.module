@@ -8,13 +8,10 @@
  */
 function premium_help($section) {
   switch($section) {
-    
     case 'admin/modules#description' :
       return t('Restrict access to premium content');
-      
-    default :
-      return;
   }
+  return;
 }
 
 /**
@@ -36,7 +33,7 @@ function premium_settings() {
     '#title'         => t('Mode'), 
     '#default_value' => variable_get('premium_mode', '0'), 
     '#options'       => array(
-      '0' => t('Premium items stay premium indefinitely'), 
+      '0' => t('Premium items are permanently restricted'), 
       'archive' => t('Protect archives only: Items switch to premium status after a specified period'), 
       'latest' => t('Protect latest content only: Items switch to non-premium status after a specified period'), 
     ),
@@ -68,7 +65,6 @@ function premium_settings() {
     '#rows'          => 30, 
     '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
   );
-  
   return $form;
 }
 
@@ -76,65 +72,50 @@ function premium_settings() {
  * Implementation of hook_cron()
  */
 function premium_cron() {
-  db_query('DELETE FROM {premium} WHERE start_ts < NOW() AND end_ts != 0 AND end_ts > NOW()');
+  db_query('DELETE FROM {premium} WHERE start_ts < NOW() AND end_ts != 0 AND end_ts < NOW()');
 }
 
 /**
  * Implementation of hook_nodeapi()
  */
-function premium_nodeapi(&$node, $op, $teaser, $page) {
-  $start_ts = $node->created;
-  $end_ts   = 0;
+function premium_nodeapi(&$node, $op, $teaser) {
   switch ($op) {
     
     case 'delete':
-      db_query('DELETE FROM {premium} WHERE nid=%d', $node->nid);
-      return;
-      
     case 'insert':
-      if ($node->premium) {
-        _premium_offset($start_ts, $end_ts);
-        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) VALUES ( %d, %d, %d )'
-          , $node->nid, $start_ts, $end_ts);
-      }
-      return;
-      
     case 'update':
-      if (!$node->nid) return;
-      
-      db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
-      
+      if ($node->nid) {
+        db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
+        if ($op == 'delete') return;
+      }
       if ($node->premium) {
-        _premium_offset($start_ts, $end_ts);
+        _premium_offset($node, $start_ts = 0, $end_ts = 0);
         db_query('INSERT INTO {premium} (nid, start_ts, end_ts) VALUES ( %d, %d, %d )'
           , $node->nid, $start_ts, $end_ts);
       }
       return;
       
     case 'load':
-      $premium = (int) db_result(db_query('SELECT 1 FROM {premium} 
-    			WHERE nid = %d 
-    			AND ( start_ts > NOW() OR start_ts = 0 )
-    			AND ( end_ts < NOW() OR end_ts = 0 )', $node->nid));
-      return array('premium' => $premium);
+      return array('premium' => (int) db_result(db_query(
+      		'SELECT 1 FROM {premium}  WHERE nid = %d 
+    			AND ( start_ts = 0 OR start_ts > NOW()) AND end_ts < NOW()', $node->nid)));
       
     case 'view':
       global $user;
       if (!$node->premium || user_access('access premium content')) {
 		    return;                  // not premium content or user has privileges
 		  }
-      if ($teaser || !$node->body || $node->body == $node->teaser) {
+      if ($teaser) {
         return;                  // not viewing the body
       }
       foreach (module_implements('premium_access') as $name) {
         $function = $name.'_premium_access';
         if ($function($user, $node)) {
-          return;              // access granted explicitly
+          return;                // access granted explicitly
         }
       }
   
-      $node->body = theme('premium_body', $node->teaser);
-      return;
+      $node->body = theme('premium_body', $node);
   }
   return;
 } 
@@ -147,25 +128,23 @@ function premium_nodeapi(&$node, $op, $teaser, $page) {
  */
 function premium_form_alter($form_id, &$form) {
   $type = $form['type']['#value'];
+  $title = t('Access restricted for non-premium users');
   
   switch ($form_id) {
     
     case $type.'_node_settings':
-      $form['workflow']["node_options_$type"]['premium'] = array(
-        '#type'      		=> 'checkbox',
-        '#title'         => t('Access restricted for non-premium users'),
-        '#weight'        => 9,
-        '#default_value' => (int) in_array('premium', variable_get("node_options_{$type}",array())),
-      );
+      $form['workflow']["node_options_$type"]['#options']['premium'] = $title;
+      if (in_array('premium', variable_get("node_options_{$type}",array()))) {
+        $form['workflow']["node_options_$type"]['#default_value'][] = 'premium';
+      }
       return;
       
     case $type.'_node_form':
       $node = $form['#node'];
       $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
+      $form['options']['premium'] = $title;
       $form['options']['premium'] = array(
-        '#type'      		=> 'checkbox',
-        '#title'         => t('Access restricted for non-premium users'),
-        '#default_value' => $premium,
+        '#type' => 'checkbox', '#title' => $title, '#default_value' => $premium,
       );
       return;
   }
@@ -174,33 +153,29 @@ function premium_form_alter($form_id, &$form) {
 /**
  * Calculate time offset for auto-aging / auto-archiving
  */
-function _premium_offset(&$start_ts, &$end_ts) {
+function _premium_offset($node, &$start_ts, &$end_ts) {
   $c = variable_get('premium_time_count',2);
   $u = variable_get('premium_time_unit','W');
-  $s = $start_ts;
+  $s = $node->created;
   
   switch ( variable_get('premium_mode', 0) ) {
     
     case 'archive' :             // public first, premium after awhile
       $start_ts = mktime(date('H',$s)+($u=='H')*$c, 0, 0, date('m',$s)+($u=='M')*$c,
         date('d',$s)+($u=='D')*$c+($u=='W')*$c*7, date('y',$s)+($u=='Y')*$c);
-      $end_ts   = 0;
       return;
     
-    case 'latest' :             // premium at first, ages to general availability
+    case 'latest' :             // premium first, ages to general availability
       $end_ts   = mktime(date('H',$s)+($u=='H')*$c, 0, 0, date('m',$s)+($u=='M')*$c,
         date('d',$s)+($u=='D')*$c+($u=='W')*$c*7, date('y',$s)+($u=='Y')*$c);
-      $start_ts = 0;
-      return;
-    
-    default :
       return;
   }
+  return;
 }
 
 /**
  * Reformat the message body with a premium content message
  */
-function theme_premium_body($teaser) {
-  return $teaser . '<br />'.variable_get('premium_message',kk1G);
+function theme_premium_body($node) {
+  return $node->teaser . '<br />'.variable_get('premium_message','');
 }
