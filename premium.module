@@ -140,12 +140,15 @@ function premium_form_alter($form_id, &$form) {
       return;
       
     case $type.'_node_form':
-      $node = $form['#node'];
-      $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
-      $form['options']['premium'] = $title;
-      $form['options']['premium'] = array(
-        '#type' => 'checkbox', '#title' => $title, '#default_value' => $premium,
-      );
+      if (user_access('administer nodes')) {
+        $node = $form['#node'];
+        $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
+        $form['options']['premium'] = array(
+          '#type' => 'checkbox', 
+          '#title' => $title, 
+          '#default_value' => $premium,
+        );
+      }
       return;
   }
 }
