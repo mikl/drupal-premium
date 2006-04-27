@@ -25,46 +25,25 @@ function premium_perm() {
  * Implementation of hook_settings()
  */
 function premium_settings() {
-  $form = array();
+  $form = '';
   
   // timeframe for premium + update existing nodes
-  $form['premium_mode'] = array(
-    '#type'          => 'radios', 
-    '#title'         => t('Mode'), 
-    '#default_value' => variable_get('premium_mode', '0'), 
-    '#options'       => array(
+  $options = array(
       '0' => t('Premium items are permanently restricted'), 
       'archive' => t('Protect archives only: Items switch to premium status after a specified period'), 
       'latest' => t('Protect latest content only: Items switch to non-premium status after a specified period'), 
-    ),
   );
+  $form .= form_radios(t('Mode'), 'premium_mode', variable_get('premium_mode', '0'), $options);
   
-  $form['premium_time_count'] = array(
-    '#type'          => 'select', 
-    '#title'         => t('Count'), 
-    '#default_value' => variable_get('premium_time_count', '2'), 
-    '#options'       => array(1=>1, 2=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 8=>8, 9=>9, 
-      10=>10, 11=>11, 12=>12, 13=>13, 14=>14, 15=>15), 
-  );
+  $options = array(1=>1, 2=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 8=>8, 9=>9, 
+    10=>10, 11=>11, 12=>12, 13=>13, 14=>14, 15=>15);
+  $form .= form_select(t('Count'), 'premium_time_count', variable_get('premium_time_count', '2'), $options);
   
-  $form['premium_time_unit'] = array(
-    '#type'          => 'select', 
-    '#title'         => t('Unit'), 
-    '#default_value' => variable_get('premium_time_unit', 'W'), 
-    '#options'       => array('D' => t('Days'), 
-    		'W' => t('Weeks'), 
-    		'M' => t('Months'), 
-    		'Y' => t('Years')), 
-  );
+  $options = array('D' => t('Days'), 'W' => t('Weeks'), 'M' => t('Months'), 'Y' => t('Years')); 
+  $form .= form_select(t('Unit'), 'premium_time_unit', variable_get('premium_time_unit', 'W'), $options);
   
-  $form['premium_message'] = array(
-    '#type'          => 'textarea', 
-    '#title'         => t('Premium body text'), 
-    '#default_value' => variable_get('premium_message', t('Full text available to premium subscribers only')), 
-    '#cols'          => 60, 
-    '#rows'          => 30, 
-    '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
-  );
+  $form .= form_textarea(t('Premium body text'), 'premium_message', variable_get('premium_message', t('Full text available to premium subscribers only')), 60, 30, t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text'));
+  
   return $form;
 }
 
@@ -100,6 +79,11 @@ function premium_nodeapi(&$node, $op, $teaser) {
       		'SELECT 1 FROM {premium}  WHERE nid = %d 
     			AND ( start_ts = 0 OR start_ts > NOW()) AND end_ts < NOW()', $node->nid)));
       
+    case 'settings':
+      return form_checkbox(t('Access restricted for non-premium users'), "node_{$node->type}_premium", 1, variable_get("node_{$node->type}_premium", 0));
+    case 'form admin':
+      return form_checkbox(t('Access restricted for non-premium users'), 'premium', 1, variable_get("node_{$node->type}_premium", 0));
+      
     case 'view':
       global $user;
       if (!$node->premium || user_access('access premium content')) {
@@ -119,36 +103,6 @@ function premium_nodeapi(&$node, $op, $teaser) {
   }
   return;
 } 
-
-/**
- * Implementation of hook_form_alter()
- * 
- * Add the Premium checkbox to the node editing options and default settings
- * The Premium flag will behave like other options (published, promote, etc)
- */
-function premium_form_alter($form_id, &$form) {
-  $type = $form['type']['#value'];
-  $title = t('Access restricted for non-premium users');
-  
-  switch ($form_id) {
-    
-    case $type.'_node_settings':
-      $form['workflow']["node_options_$type"]['#options']['premium'] = $title;
-      if (in_array('premium', variable_get("node_options_{$type}",array()))) {
-        $form['workflow']["node_options_$type"]['#default_value'][] = 'premium';
-      }
-      return;
-      
-    case $type.'_node_form':
-      $node = $form['#node'];
-      $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
-      $form['options']['premium'] = $title;
-      $form['options']['premium'] = array(
-        '#type' => 'checkbox', '#title' => $title, '#default_value' => $premium,
-      );
-      return;
-  }
-}
 
 /**
  * Calculate time offset for auto-aging / auto-archiving
