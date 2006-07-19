@@ -101,10 +101,12 @@ function premium_nodeapi(&$node, $op, $teaser) {
     			AND ( start_ts = 0 OR start_ts > NOW()) AND end_ts < NOW()', $node->nid)));
       
     case 'view':
+      $node->premium_access = true;
+
       global $user;
       if (!$node->premium || user_access('access premium content')) {
-		    return;                  // not premium content or user has privileges
-		  }
+        return;                  // not premium content or user has privileges
+      }
       if ($teaser) {
         return;                  // not viewing the body
       }
@@ -115,6 +117,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
         }
       }
   
+      $node->premium_access = false;
       $node->body = theme('premium_body', $node);
   }
   return;
