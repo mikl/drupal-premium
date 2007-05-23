@@ -116,7 +116,6 @@ function premium_nodeapi(&$node, $op, $teaser) {
           return;                // access granted explicitly
         }
       }
-  
       $node->premium_access = false;
       $node->body = theme('premium_body', $node);
   }
@@ -183,5 +182,5 @@ function _premium_offset($node, &$start_ts, &$end_ts) {
  * Reformat the message body with a premium content message
  */
 function theme_premium_body($node) {
-  return $node->teaser . '<br />'.variable_get('premium_message','');
+  return $node->teaser . '<br />'.variable_get('premium_message', t('Full text available to premium subscribers only'));
 }
