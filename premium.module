@@ -52,9 +52,9 @@ function premium_settings() {
     '#title'         => t('Unit'), 
     '#default_value' => variable_get('premium_time_unit', 'W'), 
     '#options'       => array('D' => t('Days'), 
-    		'W' => t('Weeks'), 
-    		'M' => t('Months'), 
-    		'Y' => t('Years')), 
+        'W' => t('Weeks'), 
+        'M' => t('Months'), 
+        'Y' => t('Years')), 
   );
   
   $form['premium_message'] = array(
@@ -72,33 +72,38 @@ function premium_settings() {
  * Implementation of hook_cron()
  */
 function premium_cron() {
-  db_query('DELETE FROM {premium} WHERE start_ts < NOW() AND end_ts != 0 AND end_ts < NOW()');
+  $ts = time();
+  db_query("DELETE FROM {premium} WHERE start_ts < $ts AND end_ts != 0 AND end_ts < $ts");
 }
 
 /**
  * Implementation of hook_nodeapi()
  */
 function premium_nodeapi(&$node, $op, $teaser) {
+  $node->premium = _premium_node($node);
+
   switch ($op) {
     
-    case 'delete':
     case 'insert':
+    case 'delete':
     case 'update':
       if ($node->nid) {
         db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
         if ($op == 'delete') return;
       }
       if ($node->premium) {
-        _premium_offset($node, $start_ts = 0, $end_ts = 0);
-        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) VALUES ( %d, %d, %d )'
-          , $node->nid, $start_ts, $end_ts);
+       $start_ts = $end_ts = 0 ;
+        _premium_offset($node, $start_ts, $end_ts);
+        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) 
+          VALUES ( %d, %d, %d )', $node->nid, $start_ts, $end_ts);
       }
       return;
       
     case 'load':
+      $ts = time();
       return array('premium' => (int) db_result(db_query(
-      		'SELECT 1 FROM {premium}  WHERE nid = %d 
-    			AND ( start_ts = 0 OR start_ts > NOW()) AND end_ts < NOW()', $node->nid)));
+          "SELECT 1 FROM {premium}  WHERE nid = %d 
+          AND ( start_ts = 0 OR start_ts > $ts) AND end_ts < $ts", $node->nid)));
       
     case 'view':
       $node->premium_access = true;
@@ -137,7 +142,7 @@ function premium_form_alter($form_id, &$form) {
     
     case $type.'_node_settings':
       $form['workflow']["node_options_$type"]['#options']['premium'] = $title;
-      if (in_array('premium', variable_get("node_options_{$type}",array()))) {
+      if (_premium_node($type)) {
         $form['workflow']["node_options_$type"]['#default_value'][] = 'premium';
       }
       return;
@@ -145,11 +150,10 @@ function premium_form_alter($form_id, &$form) {
     case $type.'_node_form':
       if (user_access('administer nodes')) {
         $node = $form['#node'];
-        $premium = (int) $node->nid ? $node->premium :  in_array('premium', variable_get("node_options_{$type}",array()));
         $form['options']['premium'] = array(
           '#type' => 'checkbox', 
           '#title' => $title, 
-          '#default_value' => $premium,
+          '#default_value' => _premium_node($node),
         );
       }
       return;
@@ -164,7 +168,7 @@ function _premium_offset($node, &$start_ts, &$end_ts) {
   $u = variable_get('premium_time_unit','W');
   $s = $node->created;
   
-  switch ( variable_get('premium_mode', 0) ) {
+  switch ( variable_get('premium_mode', '0') ) {
     
     case 'archive' :             // public first, premium after awhile
       $start_ts = mktime(date('H',$s)+($u=='H')*$c, 0, 0, date('m',$s)+($u=='M')*$c,
@@ -180,8 +184,24 @@ function _premium_offset($node, &$start_ts, &$end_ts) {
 }
 
 /**
+ * Establish premium settings for a node or node type
+ */
+function _premium_node($node) {
+  // This is a node type: use default settings
+  if (is_string($node)) {
+    return in_array('premium', variable_get("node_options_{$node}",array()));
+  }
+
+  // Already has a value
+  if (isset($node->premium)) return $node->premium;
+
+  // Use default settings for this node type
+  return in_array('premium', variable_get("node_options_{$node->type}",array()));
+}
+
+/**
  * Reformat the message body with a premium content message
  */
 function theme_premium_body($node) {
-  return check_markup($node->teaser, $node->format, FALSE) . '<br />'.variable_get('premium_message','');
+  return check_markup($node->teaser, $node->format, FALSE) . '<br />'.variable_get('premium_message', t('Full text available to premium subscribers only'));
 }
