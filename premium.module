@@ -2,70 +2,25 @@
 /**
  * @file Restrict access to the full body of premium content
  */
- 
-/**
- * Implementation of hook_help()
- */
-function premium_help($section) {
-  switch($section) {
-    case 'admin/modules#description' :
-      return t('Restrict access to premium content');
-  }
-  return;
-}
 
+function premium_menu($may_cache) {
+  $items = array();
+  if ($may_cache) {
+    $items[] = array('path' => 'admin/settings/premium',
+      'title' => t('Premium'),
+      'description' => t('Settings for access control to premium content.'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => 'premium_settings',
+      'access' => user_access('administer site configuration'));
+  }
+  return $items;
+}
+ 
 /**
  * Implementation of hook_perm()
  */
 function premium_perm() {
   return array('access premium content');
-}
-
-/**
- * Implementation of hook_settings()
- */
-function premium_settings() {
-  $form = array();
-  
-  // timeframe for premium + update existing nodes
-  $form['premium_mode'] = array(
-    '#type'          => 'radios', 
-    '#title'         => t('Mode'), 
-    '#default_value' => variable_get('premium_mode', '0'), 
-    '#options'       => array(
-      '0' => t('Premium items are permanently restricted'), 
-      'archive' => t('Protect archives only: Items switch to premium status after a specified period'), 
-      'latest' => t('Protect latest content only: Items switch to non-premium status after a specified period'), 
-    ),
-  );
-  
-  $form['premium_time_count'] = array(
-    '#type'          => 'select', 
-    '#title'         => t('Count'), 
-    '#default_value' => variable_get('premium_time_count', '2'), 
-    '#options'       => array(1=>1, 2=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 8=>8, 9=>9, 
-      10=>10, 11=>11, 12=>12, 13=>13, 14=>14, 15=>15), 
-  );
-  
-  $form['premium_time_unit'] = array(
-    '#type'          => 'select', 
-    '#title'         => t('Unit'), 
-    '#default_value' => variable_get('premium_time_unit', 'W'), 
-    '#options'       => array('D' => t('Days'), 
-        'W' => t('Weeks'), 
-        'M' => t('Months'), 
-        'Y' => t('Years')), 
-  );
-  
-  $form['premium_message'] = array(
-    '#type'          => 'textarea', 
-    '#title'         => t('Premium body text'), 
-    '#default_value' => variable_get('premium_message', t('Full text available to premium subscribers only')), 
-    '#cols'          => 60, 
-    '#rows'          => 30, 
-    '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
-  );
-  return $form;
 }
 
 /**
@@ -123,7 +78,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
       }
   
       $node->premium_access = false;
-      $node->body = theme('premium_body', $node);
+      $node->content['body']['#value'] = theme('premium_body', $node);
   }
   return;
 } 
@@ -137,13 +92,12 @@ function premium_nodeapi(&$node, $op, $teaser) {
 function premium_form_alter($form_id, &$form) {
   $type = $form['type']['#value'];
   $title = t('Access restricted for non-premium users');
-  
   switch ($form_id) {
     
-    case $type.'_node_settings':
-      $form['workflow']["node_options_$type"]['#options']['premium'] = $title;
+    case 'node_type_form':
+      $form['workflow']['node_options']['#options']['premium'] = $title;
       if (_premium_node($type)) {
-        $form['workflow']["node_options_$type"]['#default_value'][] = 'premium';
+        $form['workflow']['node_options']['#default_value'][] = 'premium';
       }
       return;
       
@@ -159,6 +113,54 @@ function premium_form_alter($form_id, &$form) {
       return;
   }
 }
+
+/**
+ * Settings form
+ */
+function premium_settings() {
+  $form = array();
+  
+  // timeframe for premium + update existing nodes
+  $form['premium_mode'] = array(
+    '#type'          => 'radios', 
+    '#title'         => t('Mode'), 
+    '#default_value' => variable_get('premium_mode', '0'), 
+    '#options'       => array(
+      '0' => t('Premium items are permanently restricted'), 
+      'archive' => t('Protect archives only: Items switch to premium status after a specified period'), 
+      'latest' => t('Protect latest content only: Items switch to non-premium status after a specified period'), 
+    ),
+  );
+  
+  $form['premium_time_count'] = array(
+    '#type'          => 'select', 
+    '#title'         => t('Count'), 
+    '#default_value' => variable_get('premium_time_count', '2'), 
+    '#options'       => array(1=>1, 2=>2, 3=>3, 4=>4, 5=>5, 6=>6, 7=>7, 8=>8, 9=>9, 
+      10=>10, 11=>11, 12=>12, 13=>13, 14=>14, 15=>15), 
+  );
+  
+  $form['premium_time_unit'] = array(
+    '#type'          => 'select', 
+    '#title'         => t('Unit'), 
+    '#default_value' => variable_get('premium_time_unit', 'W'), 
+    '#options'       => array('D' => t('Days'), 
+        'W' => t('Weeks'), 
+        'M' => t('Months'), 
+        'Y' => t('Years')), 
+  );
+  
+  $form['premium_message'] = array(
+    '#type'          => 'textarea', 
+    '#title'         => t('Premium body text'), 
+    '#default_value' => variable_get('premium_message', t('Full text available to premium subscribers only')), 
+    '#cols'          => 60, 
+    '#rows'          => 30, 
+    '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
+  );
+  return system_settings_form($form);
+}
+
 
 /**
  * Calculate time offset for auto-aging / auto-archiving
@@ -203,5 +205,5 @@ function _premium_node($node) {
  * Reformat the message body with a premium content message
  */
 function theme_premium_body($node) {
-  return check_markup($node->teaser, $node->format, FALSE) . '<br />'.variable_get('premium_message', t('Full text available to premium subscribers only'));
+  return check_markup($node->teaser, $node->format, FALSE) . '<div class="premium-message">'.variable_get('premium_message', t('Full text available to premium subscribers only')).'</div>';
 }
