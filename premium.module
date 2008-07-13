@@ -158,6 +158,10 @@ function premium_settings() {
     '#rows'          => 30, 
     '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
   );
+
+  if (module_exists('filter')) {
+    $form['premium_format'] = filter_form(variable_get('premium_format', FILTER_FORMAT_DEFAULT), NULL, array('premium_format'));
+  }
   return system_settings_form($form);
 }
 
@@ -205,5 +209,5 @@ function _premium_node($node) {
  * Reformat the message body with a premium content message
  */
 function theme_premium_body($node) {
-  return check_markup($node->teaser, $node->format, FALSE) . '<div class="premium-message">'.variable_get('premium_message', t('Full text available to premium subscribers only')).'</div>';
+  return check_markup($node->teaser, $node->format, FALSE) . '<div class="premium-message">'.check_markup(variable_get('premium_message', t('Full text available to premium subscribers only')), variable_get('premium_format', FILTER_FORMAT_DEFAULT), FALSE).'</div>';
 }
