@@ -57,9 +57,10 @@ function premium_nodeapi(&$node, $op, $teaser) {
     case 'load':
       $ts = time();
       return array('premium' => (int) db_result(db_query(
-          'SELECT 1 FROM {premium}  WHERE nid = %d 
-          AND ( start_ts = 0 OR start_ts > %d) 
-          AND end_ts < %d', $ts, $ts, $node->nid)));
+          "SELECT 1 FROM {premium}  WHERE nid = %d
+          AND ( start_ts = 0 and end_ts > %d)
+          OR ( start_ts < %d AND end_ts = 0)
+          OR ( start_ts = 0 AND end_ts = 0)", $node->nid, $ts, $ts)));
       
     case 'view':
       $node->premium_access = true;
