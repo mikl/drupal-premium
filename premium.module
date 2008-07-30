@@ -48,7 +48,11 @@ function premium_nodeapi(&$node, $op, $teaser) {
       }
       if ($node->premium) {
         $start_ts = $end_ts = 0 ;
-        _premium_offset($node, $start_ts, $end_ts);
+        $mode = variable_get('premium_mode', 0);
+        $count = variable_get('premium_time_count', 2);
+        $unit = variable_get('premium_time_unit', 'W');
+        _premium_offset($node->created, $start_ts, $end_ts, $mode, $count, $unit);
+
         db_query('INSERT INTO {premium} (nid, start_ts, end_ts) 
           VALUES ( %d, %d, %d )', $node->nid, $start_ts, $end_ts);
       }
@@ -172,28 +176,28 @@ function premium_settings() {
 /**
  * Calculate time offset for auto-aging / auto-archiving
  */
-function _premium_offset($node, &$start_ts, &$end_ts) {
+function _premium_offset($ts, &$start_ts, &$end_ts, $mode, $count, $unitnit) {
   $c = variable_get('premium_time_count', 2);
-  $u = variable_get('premium_time_unit', 'W');
-  $s = $node->created;
+  $unit = variable_get('premium_time_unit', 'W');
+  $ts = $node->created;
   
-  switch ( variable_get('premium_mode', '0') ) {
+  switch ($mode) {
     
     case 'archive' :             // public first, premium after awhile
       $start_ts = mktime(
-        date('H', $s)+($u == 'H')*$c, 0, 0, 
-        date('m', $s)+($u=='M')*$c,
-        date('d', $s)+($u=='D')*$c+($u=='W')*$c*7, 
-        date('y', $s)+($u=='Y')*$c
+        date('H', $ts)+($unit == 'H')*$count, 0, 0, 
+        date('m', $ts)+($unit=='M')*$count,
+        date('d', $ts)+($unit=='D')*$count+($unit=='W')*$count*7, 
+        date('y', $ts)+($unit=='Y')*$count
       );
       return;
     
     case 'latest' :             // premium first, ages to general availability
       $end_ts = mktime(
-        date('H', $s)+($u=='H')*$c, 0, 0, 
-        date('m', $s)+($u=='M')*$c,
-        date('d', $s)+($u=='D')*$c+($u=='W')*$c*7, 
-        date('y', $s)+($u=='Y')*$c
+        date('H', $ts)+($unit=='H')*$count, 0, 0, 
+        date('m', $ts)+($unit=='M')*$count,
+        date('d', $ts)+($unit=='D')*$count+($unit=='W')*$count*7, 
+        date('y', $ts)+($unit=='Y')*$count
       );
       return;
   }
