@@ -202,7 +202,7 @@ function premium_settings() {
  */
 function premium_settings_save($form_id, $form_values) {
   $count = $form_values['premium_time_count'];
-  $unit  = $form_values['premium_unit_count'];
+  $unit  = $form_values['premium_time_unit'];
   $mode  = $form_values['premium_mode'];
   $types = $form_values['premium_node_types'];
 
@@ -273,9 +273,9 @@ function _premium_node($node) {
   if ($node->nid) {
     // Attempt to find the value from the premium table.
     return (int) db_result(db_query("SELECT 1 FROM {premium}  WHERE nid = %d
-      AND ( start_ts = 0 and end_ts > %d)
+      AND (( start_ts = 0 and end_ts > %d)
       OR ( start_ts < %d AND end_ts = 0)
-      OR ( start_ts = 0 AND end_ts = 0)", $node->nid, time(), time()));
+      OR ( start_ts = 0 AND end_ts = 0))", $node->nid, time(), time()));
   }
 
   // Use default settings for this node type.
