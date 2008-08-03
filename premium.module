@@ -202,7 +202,7 @@ function premium_settings() {
  */
 function premium_settings_save($form_id, $form_values) {
   $count = $form_values['premium_time_count'];
-  $unit  = $form_values['premium_unit_count'];
+  $unit  = $form_values['premium_time_unit'];
   $mode  = $form_values['premium_mode'];
   $types = $form_values['premium_node_types'];
 
@@ -253,8 +253,8 @@ function _premium_offset($timestamp, &$start_ts, &$end_ts, $mode, $count, $unit)
   // If we faked a timestamp, remove it.
   if ($ts != $timestamp) $offset -= $ts; 
 
-  if ($mode == 'archive') $end_ts = $offset;
-  if ($mode == 'latest') $start_ts = $offset;
+  if ($mode == 'archive') $start_ts = $offset;
+  if ($mode == 'latest') $end_ts = $offset;
   return;
 }
 
@@ -286,7 +286,7 @@ function _premium_node($node) {
  * Establish premium visibility settings for a node
  */
 function _premium_access($node, $teaser) {
-//  if (isset($node->premium_access)) return $node->premium_access;
+  if (isset($node->premium_access)) return $node->premium_access;
 
   // Access is granted or revoked explicitly.
   foreach (module_implements('premium_access') as $name) {
