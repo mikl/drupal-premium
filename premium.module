@@ -3,6 +3,9 @@
  * @file Restrict access to the full body of premium content
  */
 
+/**
+ * Implementation of hook_menu()
+ */
 function premium_menu($may_cache) {
   $items = array();
   if ($may_cache) {
@@ -36,53 +39,57 @@ function premium_cron() {
  */
 function premium_nodeapi(&$node, $op, $teaser) {
   $node->premium = _premium_node($node);
+  $node->premium_access = _premium_access($node, $teaser);
 
   switch ($op) {
+    case 'load':
+      return array(
+        'premium' => $node->premium,
+        'premium_access' => $node->premium_access);
     
     case 'insert':
     case 'delete':
-    case 'update':
-      if ($node->nid) {
-        db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
-        if ($op == 'delete') return;
-      }
-      if ($node->premium) {
-        $start_ts = $end_ts = 0 ;
-        _premium_offset($node, $start_ts, $end_ts);
-        db_query('INSERT INTO {premium} (nid, start_ts, end_ts) 
-          VALUES ( %d, %d, %d )', $node->nid, $start_ts, $end_ts);
-      }
+    case 'update': 
+      _premium_set_premium($node, $node->premium);
       return;
       
-    case 'load':
-      $ts = time();
-      return array('premium' => (int) db_result(db_query(
-          'SELECT 1 FROM {premium}  WHERE nid = %d 
-          AND ( start_ts = 0 OR start_ts > %d) 
-          AND end_ts < %d', $ts, $ts, $node->nid)));
-      
     case 'view':
-      $node->premium_access = true;
-
-      global $user;
-      if (!$node->premium || user_access('access premium content')) {
-        return;                  // not premium content or user has privileges
+      if(!$node->premium_access) {
+        $node->content['body']['#value'] = theme('premium_body', $node);
       }
-      if ($teaser) {
-        return;                  // not viewing the body
-      }
-      foreach (module_implements('premium_access') as $name) {
-        $function = $name .'_premium_access';
-        if ($function($user, $node)) {
-          return;                // access granted explicitly
-        }
-      }
-  
-      $node->premium_access = false;
-      $node->content['body']['#value'] = theme('premium_body', $node);
+      return;
   }
   return;
 } 
+
+/**
+ * Implementation of hook_node_operations().
+ */
+function premium_node_operations() {
+  $operations = array(
+    'premium' => array(
+      'label' => t('Set premium status'),
+      'callback' => '_premium_node_operations_premium',
+      'callback arguments' => array(1),
+    ),
+    'unpremium' => array(
+      'label' => t('Remove premium status'),
+      'callback' => '_premium_node_operations_premium',
+      'callback arguments' => array(0),
+    ),
+  ); 
+  return $operations;
+}
+
+/**
+ * Callback for hook_node_operations()
+ */
+function _premium_node_operations_premium($nids, $premium = 0) {
+  foreach($nids as $nid) {
+    $node = node_load($nid);
+    _premium_set_premium($node, $premium);
+  }
+}
 
 /**
  * Implementation of hook_form_alter()
@@ -120,7 +127,24 @@ function premium_form_alter($form_id, &$form) {
  */
 function premium_settings() {
   $form = array();
-  
+  $form['#validate'] = array('premium_settings_save' => array()); 
+
+  $premium_types = array();
+  foreach(node_get_types('names') as $type => $value) {
+    if(_premium_node($type)) {
+      $premium_types[$type] = $type; 
+    } else {
+      $premium_types[$type] = 0;
+    }
+  }
+
+  $form['premium_node_types'] = array(
+    '#type' => 'checkboxes',
+    '#options' => node_get_types('names'),
+    '#title' => t('Node Types'),
+    '#default_value' => $premium_types,
+  );
+
   // timeframe for premium + update existing nodes
   $form['premium_mode'] = array(
     '#type'          => 'radios', 
@@ -151,13 +175,19 @@ function premium_settings() {
         'M' => t('Months'), 
         'Y' => t('Years')), 
   );
+
+  $form['premium_bulk_update'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Bulk update premium status'),
+    '#description' => t('Update all existing nodes of the types selected above with the new premium settings.'),
+  );
   
   $form['premium_message'] = array(
     '#type'          => 'textarea', 
     '#title'         => t('Premium body text'), 
     '#default_value' => variable_get('premium_message', t('Full text available to premium subscribers only')), 
     '#cols'          => 60, 
-    '#rows'          => 30, 
+    '#rows'          => 15, 
     '#description'   => t('When a visitor doesn\'t have access to a premium item they will see this message instead of its full text')
   );
 
@@ -167,35 +197,64 @@ function premium_settings() {
   return system_settings_form($form);
 }
 
+/**
+ * Save premium status as set on admin/settings/premium to each type 
+ */
+function premium_settings_save($form_id, $form_values) {
+  $count = $form_values['premium_time_count'];
+  $unit  = $form_values['premium_unit_count'];
+  $mode  = $form_values['premium_mode'];
+  $types = $form_values['premium_node_types'];
+
+  foreach($types as $type => $premium) {
+    $node_options = variable_get('node_options_' . $type, array());
+    if (in_array('premium', $node_options)) {
+      $premium_key = array_search('premium', $node_options);
+      unset($node_options[$premium_key]);
+    }
+    if ($types[$type]) { 
+      $node_options = array_merge($node_options, array('premium'));
+      $premium_types[] = $types[$type];
+    } 
+    variable_set('node_options_' . $type, $node_options);
+  }
+  
+  if ($form_values['premium_bulk_update']) {
+    db_query("DELETE from {premium}");
+
+    $start = $end = 0;
+     _premium_offset(0, $start, $end, $mode, $count, $unit);
+
+    foreach ($premium_types as $type) {
+      // Apply the timestamp delta's to the node's created date.
+      if ($start) $start = 'created + '. (int) $start;
+      if ($end) $end = 'created + '. (int) $end;
+
+      db_query("INSERT INTO {premium} (nid, start_ts, end_ts)
+        SELECT nid, $start, $end FROM {node} WHERE type = '%s'", $type);
+     }
+  }
+}
 
 /**
  * Calculate time offset for auto-aging / auto-archiving
  */
-function _premium_offset($node, &$start_ts, &$end_ts) {
-  $c = variable_get('premium_time_count', 2);
-  $u = variable_get('premium_time_unit', 'W');
-  $s = $node->created;
-  
-  switch ( variable_get('premium_mode', '0') ) {
-    
-    case 'archive' :             // public first, premium after awhile
-      $start_ts = mktime(
-        date('H', $s)+($u == 'H')*$c, 0, 0, 
-        date('m', $s)+($u=='M')*$c,
-        date('d', $s)+($u=='D')*$c+($u=='W')*$c*7, 
-        date('y', $s)+($u=='Y')*$c
-      );
-      return;
-    
-    case 'latest' :             // premium first, ages to general availability
-      $end_ts = mktime(
-        date('H', $s)+($u=='H')*$c, 0, 0, 
-        date('m', $s)+($u=='M')*$c,
-        date('d', $s)+($u=='D')*$c+($u=='W')*$c*7, 
-        date('y', $s)+($u=='Y')*$c
-      );
-      return;
-  }
+function _premium_offset($timestamp, &$start_ts, &$end_ts, $mode, $count, $unit) {
+
+  // If the timestamp is zero, set it to "now" so mktime() will work properly.
+  $ts = $timestamp ? $timestamp : time();
+  $offset = mktime(
+    date('H', $ts)+($unit=='H')*$count, 0, 0, 
+    date('m', $ts)+($unit=='M')*$count,
+    date('d', $ts)+($unit=='D')*$count+($unit=='W')*$count*7, 
+    date('y', $ts)+($unit=='Y')*$count
+  );
+
+  // If we faked a timestamp, remove it.
+  if ($ts != $timestamp) $offset -= $ts; 
+
+  if ($mode == 'archive') $start_ts = $offset;
+  if ($mode == 'latest') $end_ts = $offset;
   return;
 }
 
@@ -208,11 +267,58 @@ function _premium_node($node) {
     return in_array('premium', variable_get("node_options_{$node}", array()));
   }
 
-  // Already has a value
+  // Already has a value.
   if (isset($node->premium)) return $node->premium;
 
-  // Use default settings for this node type
+  if ($node->nid) {
+    // Attempt to find the value from the premium table.
+    return (int) db_result(db_query("SELECT 1 FROM {premium}  WHERE nid = %d
+      AND ( start_ts = 0 and end_ts > %d)
+      OR ( start_ts < %d AND end_ts = 0)
+      OR ( start_ts = 0 AND end_ts = 0)", $node->nid, time(), time()));
+  }
+
+  // Use default settings for this node type.
   return in_array('premium', variable_get("node_options_{$node->type}", array()));
+}
+
+/**
+ * Establish premium visibility settings for a node
+ */
+function _premium_access($node, $teaser) {
+  if (isset($node->premium_access)) return $node->premium_access;
+
+  // Not viewing the body, or it's not premium, or user has privileges.
+  if ($teaser || !$node->premium || user_access('access premium content')) {
+    return TRUE;
+  }
+
+  // Access is granted explicitly.
+  foreach (module_implements('premium_access') as $name) {
+    $function = $name .'_premium_access';
+    if (is_bool($access = $function($user, $node))) {
+      return $access;
+    }
+  }
+
+  // Nobody said we could access the node. 
+  return FALSE;
+}
+ 
+/**
+ * Update the premium table with appropriate premium values for a node.
+ */
+function _premium_set_premium($node, $premium = FALSE) {
+  db_query('DELETE FROM {premium} WHERE nid = %d', $node->nid);
+  if ($premium) {
+    $start_ts = $end_ts = 0 ;
+    $mode = variable_get('premium_mode', 0);
+    $count = variable_get('premium_time_count', 2);
+    $unit = variable_get('premium_time_unit', 'W');
+    _premium_offset($node->created, $start_ts, $end_ts, $mode, $count, $unit);
+    db_query('INSERT INTO {premium} (nid, start_ts, end_ts) 
+              VALUES ( %d, %d, %d )', $node->nid, $start_ts, $end_ts);
+  }
 }
 
 /**
