@@ -253,8 +253,8 @@ function _premium_offset($timestamp, &$start_ts, &$end_ts, $mode, $count, $unit)
   // If we faked a timestamp, remove it.
   if ($ts != $timestamp) $offset -= $ts; 
 
-  if ($mode == 'archive') $start_ts = $offset;
-  if ($mode == 'latest') $end_ts = $offset;
+  if ($mode == 'archive') $end_ts = $offset;
+  if ($mode == 'latest') $start_ts = $offset;
   return;
 }
 
@@ -273,9 +273,9 @@ function _premium_node($node) {
   if ($node->nid) {
     // Attempt to find the value from the premium table.
     return (int) db_result(db_query("SELECT 1 FROM {premium}  WHERE nid = %d
-      AND ( start_ts = 0 and end_ts > %d)
+      AND (( start_ts = 0 and end_ts > %d)
       OR ( start_ts < %d AND end_ts = 0)
-      OR ( start_ts = 0 AND end_ts = 0)", $node->nid, time(), time()));
+      OR ( start_ts = 0 AND end_ts = 0))", $node->nid, time(), time()));
   }
 
   // Use default settings for this node type.
@@ -286,7 +286,7 @@ function _premium_node($node) {
  * Establish premium visibility settings for a node
  */
 function _premium_access($node, $teaser) {
-  if (isset($node->premium_access)) return $node->premium_access;
+//  if (isset($node->premium_access)) return $node->premium_access;
 
   // Access is granted or revoked explicitly.
   foreach (module_implements('premium_access') as $name) {
