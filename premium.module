@@ -288,17 +288,17 @@ function _premium_node($node) {
 function _premium_access($node, $teaser) {
   if (isset($node->premium_access)) return $node->premium_access;
 
-  // Not viewing the body, or it's not premium, or user has privileges.
-  if ($teaser || !$node->premium || user_access('access premium content')) {
-    return TRUE;
-  }
-
-  // Access is granted explicitly.
+  // Access is granted or revoked explicitly.
   foreach (module_implements('premium_access') as $name) {
     $function = $name .'_premium_access';
     if (is_bool($access = $function($user, $node))) {
       return $access;
     }
+  }
+
+  // Not viewing the body, or it's not premium, or user has privileges.
+  if ($teaser || !$node->premium || user_access('access premium content')) {
+    return TRUE;
   }
 
   // Nobody said we could access the node. 
