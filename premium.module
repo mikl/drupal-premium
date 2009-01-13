@@ -157,7 +157,7 @@ function premium_settings() {
     ),
   );
   
-  $options = (range(1, 15));
+  $options = (range(0, 15));
   unset($options[0]);
   $form['premium_time_count'] = array(
     '#type'          => 'select', 
@@ -222,10 +222,9 @@ function premium_settings_save($form_id, $form_values) {
   if ($form_values['premium_bulk_update']) {
     db_query("DELETE from {premium}");
 
-    $start = $end = 0;
-     _premium_offset(0, $start, $end, $mode, $count, $unit);
-
     foreach ($premium_types as $type) {
+      $start = $end = 0;
+      _premium_offset(0, $start, $end, $mode, $count, $unit);
       // Apply the timestamp delta's to the node's created date.
       if ($start) $start = 'created + '. (int) $start;
       if ($end) $end = 'created + '. (int) $end;
