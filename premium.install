@@ -1,30 +1,45 @@
 <?php
 // $Id$
 
+/**
+ * Implementation of hook_install().
+ */
 function premium_install() {
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      db_query('CREATE TABLE {premium} (
-        nid               INT NOT NULL,
-        start_ts          INT,
-        end_ts            INT,
-        PRIMARY KEY(nid)
-      ) /*!40100 DEFAULT CHARACTER SET utf8 */;');
-      break;
-    case 'pgsql':
-      db_query('CREATE TABLE {premium} (
-        nid               INT NOT NULL,
-        start_ts          INT,
-        end_ts            INT,
-        PRIMARY KEY(nid)
-      )');
-      break;
-  }
+  drupal_install_schema('premium');
 }
 
+/**
+ * Implementation of hook_schema().
+ */
+function premium_schema() {
+  $schema['premium'] = array(
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ),
+      'start_ts' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'disp-width' => '11',
+      ),
+      'end_ts' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'disp-width' => '11',
+      ),
+    ),
+    'primary key' => array('nid'),
+  );
+  return $schema;
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
 function premium_uninstall() {
-  db_query('DROP TABLE {premium}');
+  drupal_uninstall_schema('premium');
   variable_del('premium_mode');
   variable_del('premium_time_count');
   variable_del('premium_time_unit');

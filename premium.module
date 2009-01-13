@@ -1,4 +1,6 @@
-<?php /* $Id$ */
+<?php 
+// $Id$
+
 /**
  * @file Restrict access to the full body of premium content
  */
@@ -6,16 +8,15 @@
 /**
  * Implementation of hook_menu()
  */
-function premium_menu($may_cache) {
+function premium_menu() {
   $items = array();
-  if ($may_cache) {
-    $items[] = array('path' => 'admin/settings/premium',
-      'title' => t('Premium'),
-      'description' => t('Settings for access control to premium content.'),
-      'callback' => 'drupal_get_form',
-      'callback arguments' => 'premium_settings',
-      'access' => user_access('administer site configuration'));
-  }
+  $items['admin/settings/premium'] = array(
+    'title' => 'Premium',
+    'description' => 'Settings for access control to premium content.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('premium_settings'),
+    'access arguments' => array('administer site configuration'),
+  );
   return $items;
 }
  
@@ -31,7 +32,7 @@ function premium_perm() {
  */
 function premium_cron() {
   $ts = time();
-  db_query("DELETE FROM {premium} WHERE start_ts < $ts AND end_ts != 0 AND end_ts < $ts");
+  db_query("DELETE FROM {premium} WHERE start_ts < %d AND end_ts <> 0 AND end_ts < %d", $ts, $ts);
 }
 
 /**
@@ -54,7 +55,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
       return;
       
     case 'view':
-      if(!$node->premium_access) {
+      if (!$node->premium_access) {
         $node->content['body']['#value'] = theme('premium_body', $node);
       }
       return;
@@ -85,7 +86,7 @@ function premium_node_operations() {
  * Callback for hook_node_operations()
  */
 function _premium_node_operations_premium($nids, $premium = 0) {
-  foreach($nids as $nid) {
+  foreach ($nids as $nid) {
     $node = node_load($nid);
     _premium_set_premium($node, $premium);
   }
@@ -97,7 +98,7 @@ function _premium_node_operations_premium($nids, $premium = 0) {
  * Add the Premium checkbox to the node editing options and default settings
  * The Premium flag will behave like other options (published, promote, etc)
  */
-function premium_form_alter($form_id, &$form) {
+function premium_form_alter(&$form, $form_state, $form_id) {
   $type = $form['type']['#value'];
   $title = t('Access restricted for non-premium users');
   switch ($form_id) {
@@ -127,13 +128,14 @@ function premium_form_alter($form_id, &$form) {
  */
 function premium_settings() {
   $form = array();
-  $form['#validate'] = array('premium_settings_save' => array()); 
+  $form['#validate'] = array('premium_settings_validate'); 
 
   $premium_types = array();
-  foreach(node_get_types('names') as $type => $value) {
-    if(_premium_node($type)) {
+  foreach (node_get_types('names') as $type => $value) {
+    if (_premium_node($type)) {
       $premium_types[$type] = $type; 
-    } else {
+    } 
+    else {
       $premium_types[$type] = 0;
     }
   }
@@ -157,7 +159,7 @@ function premium_settings() {
     ),
   );
   
-  $options = (range(1, 15));
+  $options = (range(0, 15));
   unset($options[0]);
   $form['premium_time_count'] = array(
     '#type'          => 'select', 
@@ -192,7 +194,7 @@ function premium_settings() {
   );
 
   if (module_exists('filter')) {
-    $form['premium_format'] = filter_form(variable_get('premium_format', FILTER_FORMAT_DEFAULT), null, array('premium_format'));
+    $form['premium_format'] = filter_form(variable_get('premium_format', FILTER_FORMAT_DEFAULT), NULL, array('premium_format'));
   }
   return system_settings_form($form);
 }
@@ -200,14 +202,14 @@ function premium_settings() {
 /**
  * Save premium status as set on admin/settings/premium to each type 
  */
-function premium_settings_save($form_id, $form_values) {
-  $count = $form_values['premium_time_count'];
-  $unit  = $form_values['premium_time_unit'];
-  $mode  = $form_values['premium_mode'];
-  $types = $form_values['premium_node_types'];
+function premium_settings_validate($form, &$form_state) {
+  $count = $form_state['values']['premium_time_count'];
+  $unit  = $form_state['values']['premium_time_unit'];
+  $mode  = $form_state['values']['premium_mode'];
+  $types = $form_state['values']['premium_node_types'];
 
-  foreach($types as $type => $premium) {
-    $node_options = variable_get('node_options_' . $type, array());
+  foreach ($types as $type => $premium) {
+    $node_options = variable_get('node_options_'. $type, array());
     if (in_array('premium', $node_options)) {
       $premium_key = array_search('premium', $node_options);
       unset($node_options[$premium_key]);
@@ -216,16 +218,15 @@ function premium_settings_save($form_id, $form_values) {
       $node_options = array_merge($node_options, array('premium'));
       $premium_types[] = $types[$type];
     } 
-    variable_set('node_options_' . $type, $node_options);
+    variable_set('node_options_'. $type, $node_options);
   }
   
-  if ($form_values['premium_bulk_update']) {
+  if ($form_state['values']['premium_bulk_update']) {
     db_query("DELETE from {premium}");
 
-    $start = $end = 0;
-     _premium_offset(0, $start, $end, $mode, $count, $unit);
-
     foreach ($premium_types as $type) {
+      $start = $end = 0;
+      _premium_offset(0, $start, $end, $mode, $count, $unit);
       // Apply the timestamp delta's to the node's created date.
       if ($start) $start = 'created + '. (int) $start;
       if ($end) $end = 'created + '. (int) $end;
@@ -322,8 +323,19 @@ function _premium_set_premium($node, $premium = FALSE) {
 }
 
 /**
+ * Implementation of hook_theme().
+ */
+function premium_theme() {
+  return array(
+    'premium_body' => array(
+      'arguments' => array('node' => NULL),
+    ),
+  );
+}
+
+/**
  * Reformat the message body with a premium content message
  */
 function theme_premium_body($node) {
-  return check_markup($node->teaser, $node->format, false) .'<div class="premium-message">'. check_markup(variable_get('premium_message', t('Full text available to premium subscribers only')), variable_get('premium_format', FILTER_FORMAT_DEFAULT), false) .'</div>';
+  return check_markup($node->teaser, $node->format, FALSE) .'<div class="premium-message">'. check_markup(variable_get('premium_message', t('Full text available to premium subscribers only')), variable_get('premium_format', FILTER_FORMAT_DEFAULT), FALSE) .'</div>';
 }
