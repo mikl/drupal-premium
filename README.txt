@@ -1,4 +1,3 @@
-$Id$
 
 Restricts access to premium content by role.
 
