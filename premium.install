@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 function premium_install() {
   switch ($GLOBALS['db_type']) {
