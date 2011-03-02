@@ -11,7 +11,10 @@ function premium_install() {
  * Implementation of hook_schema().
  */
 function premium_schema() {
+  $schema = array();
+
   $schema['premium'] = array(
+    'description' => 'Stores the premium status of nodes.',
     'fields' => array(
       'nid' => array(
         'type' => 'int',
@@ -34,6 +37,7 @@ function premium_schema() {
     ),
     'primary key' => array('nid'),
   );
+
   return $schema;
 }
 
