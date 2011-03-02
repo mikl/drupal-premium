@@ -16,17 +16,20 @@ function premium_schema() {
       'nid' => array(
         'type' => 'int',
         'not null' => TRUE,
-        'disp-width' => '11',
+        'unsigned' => TRUE,
+        'description' => 'The {node}.nid this record affects.',
       ),
       'start_ts' => array(
         'type' => 'int',
         'not null' => FALSE,
-        'disp-width' => '11',
+        'unsigned' => TRUE,
+        'description' => 'Unix timestamp for when premium status starts.',
       ),
       'end_ts' => array(
         'type' => 'int',
         'not null' => FALSE,
-        'disp-width' => '11',
+        'unsigned' => TRUE,
+        'description' => 'Unix timestamp for when premium status ends.',
       ),
     ),
     'primary key' => array('nid'),
