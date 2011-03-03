@@ -15,7 +15,7 @@ function premium_admin_overview_page() {
   $levels = premium_level_load_all();
 
   // Help text.
-  $output = "Premium content is content that is restricted to certain users of a web site. To create premium content: ". l('add a level', 'admin/content/premium/add') .", ". l('set permissions', 'admin/user/access') ." for your users, set a default level for each ". l('content type', 'admin/content/types') .", and create new content as usual.";
+  $output = "Premium content is content that is restricted to certain users of a web site. To create premium content: ". l('add a level', 'admin/content/premium/add') .", ". l('set permissions', 'admin/user/permissions') ." for your users, set a default level for each ". l('content type', 'admin/content/types') .", and create new content as usual.";
 
   // Generate table headers.
   $header = array(
@@ -155,7 +155,7 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
 function premium_admin_level_edit_form_submit($form_id, &$form_state) {
   $level = $form_state['values'];
   premium_level_save($level);
-  
+
   $form_state['redirect'] = 'admin/content/premium';
 }
 
