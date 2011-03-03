@@ -44,7 +44,7 @@ function premium_schema() {
     'primary key' => array('nid', 'level_id'),
   );
 
-  $premium['premium_levels'] = array(
+  $schema['premium_levels'] = array(
     'description' => 'Stores premium levels and their settings.',
     'fields' => array(
       'level_id' => array(
