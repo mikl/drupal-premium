@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * @file Restrict access to the full body of premium content
  */
@@ -20,7 +20,7 @@ function premium_menu() {
   $items['admin/content/premium/overview'] = array(
     'title' => t('Overview'),
     'type' => MENU_DEFAULT_LOCAL_TASK,
-    'weight' => '-10', 
+    'weight' => '-10',
   );
 
   $items['admin/content/premium/add'] = array(
@@ -28,7 +28,7 @@ function premium_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('premium_admin_level_edit_form'),
     'access arguments' => array('administer premium content levels'),
-    'type' => MENU_LOCAL_TASK, 
+    'type' => MENU_LOCAL_TASK,
     'file' => 'premium.admin.inc',
   );
 
@@ -37,7 +37,7 @@ function premium_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('premium_admin_level_edit_form', 3),
     'access arguments' => array('administer premium content levels'),
-    'type' => MENU_CALLBACK, 
+    'type' => MENU_CALLBACK,
     'file' => 'premium.admin.inc',
   );
 
@@ -46,13 +46,13 @@ function premium_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('premium_admin_level_delete_form', 3),
     'access arguments' => array('administer premium content levels'),
-    'type' => MENU_CALLBACK, 
+    'type' => MENU_CALLBACK,
     'file' => 'premium.admin.inc',
   );
 
   return $items;
 }
- 
+
 /**
  * Implementation of hook_perm()
  */
@@ -94,7 +94,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
       );
     case 'insert':
     case 'delete':
-    case 'update': 
+    case 'update':
       _premium_set_premium($node, $node->premium);
       break;
     case 'view':
@@ -103,7 +103,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
       }
       break;
   }
-} 
+}
 
 /**
  * Implementation of hook_node_operations().
@@ -120,7 +120,7 @@ function premium_node_operations() {
       'callback' => '_premium_node_operations_premium',
       'callback arguments' => array(0),
     ),
-  ); 
+  );
   return $operations;
 }
 
@@ -144,13 +144,13 @@ function premium_form_node_type_form_alter(&$form, &$form_state) {
     '#type' => 'select',
     '#title' => t('Default premium content level'),
     '#default_value' => variable_get("premium_{$node_type}", 0),
-    '#options' => array(0 => t('None')) + premium_level_option_list(), 
+    '#options' => array(0 => t('None')) + premium_level_option_list(),
   );
 }
 
 /**
  * Implementation of hook_form_alter()
- * 
+ *
  * Add the Premium checkbox to the node editing options and default settings
  * The Premium flag will behave like other options (published, promote, etc).
  */
@@ -161,7 +161,7 @@ function premium_form_alter(&$form, $form_state, $form_id) {
     if (user_access('administer node premium status')) {
       $node = $form['#node'];
       $form['options']['premium'] = array(
-        '#type' => 'select', 
+        '#type' => 'select',
         '#title' => t('Premium content level'),
         '#default_value' => (integer) premium_node_level($node),
         '#options' => array(0 => t('None')) + premium_level_option_list(),
@@ -246,9 +246,9 @@ function _premium_offset($timestamp, &$start_ts, &$end_ts, $mode, $count, $unit)
   // If the timestamp is zero, set it to "now" so mktime() will work properly.
   $ts = $timestamp ? $timestamp : $_SERVER['REQUEST_TIME'];
   $offset = mktime(
-    date('H', $ts) + ($unit=='H') * $count, 0, 0, 
+    date('H', $ts) + ($unit=='H') * $count, 0, 0,
     date('m', $ts) + ($unit=='M') * $count,
-    date('d', $ts) + ($unit=='D') * $count + ($unit == 'W') * $count * 7, 
+    date('d', $ts) + ($unit=='D') * $count + ($unit == 'W') * $count * 7,
     date('y', $ts) + ($unit=='Y') * $count
   );
 
@@ -281,7 +281,7 @@ function premium_node_level($node) {
       OR ( start_ts < %d AND end_ts = 0)
       OR ( start_ts = 0 AND end_ts = 0))
     ", array(
-      ':nid' => $node->nid, 
+      ':nid' => $node->nid,
       ':ts' => $_SERVER['REQUEST_TIME'],
       ':ts2' => $_SERVER['REQUEST_TIME'],
     ));
@@ -314,10 +314,10 @@ function _premium_access($node, $teaser) {
     return TRUE;
   }
 
-  // Nobody said we could access the node. 
+  // Nobody said we could access the node.
   return FALSE;
 }
- 
+
 /**
  * Update the premium table with appropriate premium values for a node.
  */
@@ -329,7 +329,7 @@ function _premium_set_premium($node, $level_id = FALSE) {
     $start_ts = $end_ts = 0 ;
     _premium_offset($node->created, $start_ts, $end_ts, $level['proctection_type'], $level['duration'], $level['duration_unit']);
     db_query('
-      INSERT INTO {premium_nodes} (nid, level_id, start_ts, end_ts) 
+      INSERT INTO {premium_nodes} (nid, level_id, start_ts, end_ts)
       VALUES ( %d, %d, %d, %d )
     ', array(
       ':nid' => $node->nid,
