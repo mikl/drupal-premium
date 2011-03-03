@@ -83,11 +83,11 @@ function premium_cron() {
  * Implementation of hook_nodeapi()
  */
 function premium_nodeapi(&$node, $op, $teaser) {
-  $node->premium = premium_node_level($node);
-  $node->premium_access = _premium_access($node, $teaser);
-
   switch ($op) {
     case 'load':
+      $node->premium = premium_node_level($node);
+      $node->premium_access = _premium_access($node, $teaser);
+
       return array(
         'premium' => $node->premium,
         'premium_access' => $node->premium_access
