@@ -265,7 +265,7 @@ function _premium_offset($timestamp, &$start_ts, &$end_ts, $mode, $count, $unit)
 function premium_node_level($node) {
   // This is a node type: use default settings
   if (is_string($node)) {
-    return in_array('premium', variable_get("premium_{$node}", array()));
+    return variable_get("premium_{$node}", 0);
   }
 
   // Already has a value.
@@ -290,7 +290,7 @@ function premium_node_level($node) {
   }
 
   // Use default settings for this node type.
-  return in_array('premium', variable_get("premium_{$node->type}", array()));
+  return variable_get("premium_{$node->type}", 0);
 }
 
 /**
