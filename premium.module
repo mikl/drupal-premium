@@ -86,7 +86,7 @@ function premium_nodeapi(&$node, $op, $teaser) {
   switch ($op) {
     case 'load':
       $node->premium = premium_node_level($node);
-      $node->premium_access = _premium_access($node, $teaser);
+      $node->premium_access = ($teaser) ? TRUE : premium_user_content_access($node);
 
       return array(
         'premium' => $node->premium,
@@ -295,28 +295,73 @@ function premium_node_level($node) {
 }
 
 /**
- * Establish premium visibility settings for a node
+ * Determines if a user has access to premium content.
+ *
+ * @param $node
+ *   The node object access is requested for.
+ * @param $account
+ *   The user to determine access for.
+ * @return
+ *   TRUE if access is granted, FALSE if not.
  */
-function _premium_access($node, $teaser) {
-  if (isset($node->premium_access)) {
+function premium_user_content_access($node, $account = NULL) {
+  global $user;
+
+  // Fall back to the current user if none was provided.
+  if (!$account) {
+    $account = $user;
+  }
+
+  // If we're determining access for the current user, reuse the
+  // premium_access on the node if present, since that is the result of
+  // this function.
+  if ($account == $user && isset($node->premium_access)) {
     return $node->premium_access;
   }
 
   // Access is granted or revoked explicitly.
   foreach (module_implements('premium_access') as $name) {
     $function = $name .'_premium_access';
-    if (is_bool($access = $function($user, $node))) {
+    if (is_bool($access = $function($node, $teaser))) {
       return $access;
     }
   }
 
-  // Not viewing the body, or it's not premium, or user has privileges.
-  if ($teaser || !$node->premium || user_access('access premium content')) {
+  // If node is not premium, always grant access.
+  if (!$node->premium) {
     return TRUE;
+  }
+
+  // If node is premium, check if user has access to the level specified.
+  if ($levels[$node->premium]) {
+    $level = premium_level_load($node->premium);
+    return user_access(_premium_permission_name($level['name']));
   }
 
   // Nobody said we could access the node.
   return FALSE;
+}
+
+/**
+ * Establish premium visibility settings for a node.
+ *
+ * This function is deprecated, and is only kept for backwards compatibility.
+ * We never restrict access to node teasers, so having it as a parameter
+ * is kinda useless. Please use premium_user_content_access instead.
+ *
+ * @param $node
+ *   The node object access is requested for.
+ * @param $teaser
+ *   TRUE if the node is being viewed in teaser mode (no access restrictions).
+ * @return
+ *   TRUE if access is granted, FALSE if not.
+ */
+function _premium_access($node, $teaser) {
+  if ($teaser) {
+    return TRUE;
+  }
+
+  return premium_user_content_access($node);
 }
 
 /**
