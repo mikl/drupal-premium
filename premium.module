@@ -63,7 +63,7 @@ function premium_perm() {
   );
 
   foreach (premium_level_option_list() as $level_name) {
-    $perms[] = 'access “' . check_plain($level_name) . '” premium content';
+    $perms[] = _premium_permission_name($level_name);
   }
 
   return $perms;
@@ -339,6 +339,13 @@ function _premium_set_premium($node, $level_id = FALSE) {
       ':end' => $end_ts,
     ));
   }
+}
+
+/**
+ * Helper function to generate permission name.
+ */
+function _premium_permission_name($level_name) {
+  return 'access “' . check_plain($level_name) . '” premium content';
 }
 
 /**
