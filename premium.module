@@ -343,7 +343,7 @@ function premium_user_content_access($node, $account = NULL) {
   }
 
   // If node is premium, check if user has access to the level specified.
-  if ($levels[$node->premium]) {
+  if ($node->premium) {
     $level = premium_level_load($node->premium);
     return user_access(_premium_permission_name($level['name']));
   }
