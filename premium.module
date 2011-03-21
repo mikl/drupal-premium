@@ -277,9 +277,10 @@ function premium_node_level($node) {
     // Attempt to find the value from the premium table.
     $query = db_query("
       SELECT level_id FROM {premium_nodes} WHERE nid = %d
-      AND (( start_ts = 0 and end_ts > %d)
-      OR ( start_ts < %d AND end_ts = 0)
-      OR ( start_ts = 0 AND end_ts = 0))
+      AND (
+        (end_ts IS NULL OR end_ts = 0 OR end_ts > %d) AND
+        (start_ts IS NULL OR start_ts = 0 OR start_ts < %d)
+      )
     ", array(
       ':nid' => $node->nid,
       ':ts' => $_SERVER['REQUEST_TIME'],
