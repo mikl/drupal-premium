@@ -171,6 +171,16 @@ function premium_form_alter(&$form, $form_state, $form_id) {
 }
 
 /**
+ * Implementation of hook_ctools_plugin_directory().
+ */
+function premium_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'ctools' && $plugin == 'access') {
+    return 'plugins/' . $plugin;
+  }
+}
+
+
+/**
  * Load a premium level based on level_id.
  */
 function premium_level_load($level_id) {
