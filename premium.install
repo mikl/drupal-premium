@@ -59,6 +59,13 @@ function premium_schema() {
         'length' => 255,
         'not null' => TRUE,
       ),
+      'machine_name' => array(
+        'type' => 'varchar', 
+        'length' => 255, 
+        'not null' => TRUE, 
+        'default' => '', 
+        'description' => 'The Premium level machine name.',
+      ), 
       'proctection_type' => array(
         'description' => 'Type of protection for this Premium level. One of “all”, “archive”, or “latest”.',
         'type' => 'varchar',
@@ -110,9 +117,9 @@ function premium_uninstall() {
 }
 
 /**
- * Upgrade the database structure to the new multilevel stuff.
+ * Upgrade the database structure to the new multilevel structure.
  */
-function premium_update_6000() {
+function premium_update_6000(&$sandbox) {
   $ret = array();
 
   // Since we are going to have more than one premium-related table, rename the original.
@@ -212,6 +219,40 @@ function premium_update_6000() {
   // level_id columns.
   db_drop_primary_key($ret, 'premium_nodes');
   db_add_primary_key($ret, 'premium_nodes', array('nid', 'level_id'));
+
+  return $ret;
+}
+
+/**
+ * Add machine name field for exportability.
+ */
+function premium_update_6001(&$sandbox) {
+  $ret = array();
+
+  // Add the machine_name field to the premium_levels table.
+  db_add_field(&$ret, 'premium_levels', 'machine_name', array(
+    'type' => 'varchar', 
+    'length' => 255, 
+    'not null' => TRUE, 
+    'default' => '', 
+    'description' => 'The Premium level machine name.',
+  ));
+
+  // Get all levels IDs.
+  $query = db_query("SELECT level_id FROM {premium_levels}");
+
+  // Generate a machine name for each.
+  while ($level_id = db_result($query)) {
+    $ret[] = update_sql("
+      UPDATE {premium_levels}
+      SET machine_name = 'level_$level_id'
+      WHERE level_id = $level_id
+    ");
+  }
+
+  // Add unique key index on the machine_name, as they are supposed to 
+  // be unique for export.
+  db_add_unique_key(&$ret, 'premium_levels', 'machine_name', array('machine_name'));
 
   return $ret;
 }

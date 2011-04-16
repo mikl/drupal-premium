@@ -85,6 +85,20 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
     '#required' => TRUE,
   );
 
+  $form['machine_name'] = array(
+    '#type' => 'textfield', 
+    '#title' => t('Machine-readable name'),
+    '#description' => t('A unique machine-readable name. Can only contain lowercase letters, numbers, and underscores.'),
+    '#default_value' => $level['machine_name'], 
+    '#maxlength' => 255, 
+    '#required' => TRUE,
+  );
+
+  $form['old_machine_name'] = array(
+    '#type' => 'value', 
+    '#value' => $level['machine_name'], 
+  );
+
   $form['proctection_type'] = array(
     '#type' => 'radios',
     '#title' => t('Protection type'),
@@ -146,11 +160,29 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
   return $form;
 }
 
+
+/**
+ * General validation handler for the premium level add/edit form.
+ *
+ * @ingroup formapi
+ * @see premium_admin_level_edit_form()
+ * @see premium_admin_level_edit_submit()
+ */
+function premium_admin_level_edit_form_validate($form_id, &$form_state) {
+  $machine_name = trim($form_state['values']['machine_name']);
+
+  // Validate machine name.
+  if (empty($machine_name) || !preg_match('/^[a-z0-9_]+$/', $machine_name)) {
+    form_set_error('machine_name', t('Machine name can only contain lowercase letters, numbers, and underscores.'));
+  }
+}
+
 /**
  * General submit handler for the premium level add/edit form.
  *
  * @ingroup formapi
  * @see premium_admin_level_edit_form()
+ * @see premium_admin_level_edit_form_validate()
  */
 function premium_admin_level_edit_form_submit($form_id, &$form_state) {
   $level = $form_state['values'];
