@@ -163,10 +163,19 @@ function premium_form_alter(&$form, $form_state, $form_id) {
       $form['options']['premium'] = array(
         '#type' => 'select',
         '#title' => t('Premium content level'),
-        '#default_value' => (integer) premium_node_level($node),
+        '#default_value' => premium_node_level($node),
         '#options' => array(0 => t('None')) + premium_level_option_list(),
       );
     }
+  }
+}
+
+/**
+ * Implementation of hook_ctools_plugin_api().
+ */
+function premium_ctools_plugin_api($owner, $api) {
+  if ($owner == 'premium' && $api == 'default_premium_levels') {
+    return array('version' => 1);
   }
 }
 
@@ -181,40 +190,41 @@ function premium_ctools_plugin_directory($module, $plugin) {
 
 
 /**
- * Load a premium level based on level_id.
+ * Load a premium level based on machine name.
+ *
+ * @param $machine_name
+ *   The machine name of the premium level to load.
  */
-function premium_level_load($level_id) {
-  $query = db_query('SELECT * FROM {premium_levels} WHERE level_id = %d', array(':id' => $level_id));
-
-  if ($level = db_fetch_array($query)) {
-    return $level;
+function premium_level_load($machine_name) {
+  ctools_include('export');
+  $result = ctools_export_load_object('premium_levels', 'names', array($machine_name));
+  if (isset($result[$machine_name])) {
+    return $result[$machine_name];
   }
+
   return FALSE;
 }
 
 /**
- * Get a list of premium levels keyed by level_id.
+ * Get a list of premium levels keyed by machine name.
  */
 function premium_level_load_all() {
-  static $levels;
-  if (!is_array($levels)) {
-    $levels = array();
-    $result = db_query('SELECT * FROM {premium_levels}');
-    while ($lvl = db_fetch_array($result)) {
-      $levels[$lvl['level_id']] = $lvl;
-    }
-  }
-  return $levels;
+  ctools_include('export');
+  return ctools_export_load_object('premium_levels');
 }
 
 /**
- * Get a list of premium level names as an id-keyed array (for selection menus, etc)
+ * Get a list of premium level names as an machine name-keyed array.
+ *
+ * Useful for selection menus, etc.
  */
 function premium_level_option_list() {
   $levels = array();
-  foreach (premium_level_load_all() as $level_id => $level) {
-    $levels[$level_id] = $level['name'];
+
+  foreach (premium_level_load_all() as $machine_name => $level) {
+    $levels[$machine_name] = $level->name;
   }
+
   return $levels;
 }
 
@@ -222,19 +232,15 @@ function premium_level_option_list() {
  * Inserts a new record, or updates an existing one.
  *
  * @param $level
- *   A level to be saved. If $level['level_id'] is set, the level will be updated.
+ *   A level to be saved. If $level->level_id is set, the level will be updated.
  *   Otherwise, a new level will be inserted into the database.
  * @return
  *   The saved level, with its level_id set.
  */
-function premium_level_save($level) {
-  if (isset($level['level_id'])) {
-    drupal_write_record('premium_levels', $level, 'level_id');
-  }
-  else {
-    drupal_write_record('premium_levels', $level);
-  }
-  return $record;
+function premium_level_save(&$level) {
+  $update = (isset($level->level_id)) ? array('level_id') : array();
+
+  return drupal_write_record('premium_levels', $level, $update);
 }
 
 /**
@@ -243,9 +249,9 @@ function premium_level_save($level) {
  * @param $record_id
  *   An int containing the ID of a record.
  */
-function premium_level_delete($level_id) {
-  db_query('DELETE FROM {premium_levels} WHERE level_id = %d', $level_id);
-  db_query('DELETE FROM {premium_nodes} WHERE level_id = %d', $level_id);
+function premium_level_delete($machine_name) {
+  db_query("DELETE FROM {premium_levels} WHERE machine_name = '%d'", $machine_name);
+  db_query("DELETE FROM {premium_nodes} WHERE machine_name = '%d'", $machine_name);
 }
 
 /**
@@ -286,16 +292,8 @@ function premium_node_level($node) {
   if ($node->nid) {
     // Attempt to find the value from the premium table.
     $query = db_query("
-      SELECT level_id FROM {premium_nodes} WHERE nid = %d
-      AND (
-        (end_ts IS NULL OR end_ts = 0 OR end_ts > %d) AND
-        (start_ts IS NULL OR start_ts = 0 OR start_ts < %d)
-      )
-    ", array(
-      ':nid' => $node->nid,
-      ':ts' => $_SERVER['REQUEST_TIME'],
-      ':ts2' => $_SERVER['REQUEST_TIME'],
-    ));
+      SELECT level_name FROM {premium_nodes} WHERE nid = %d
+    ", array(':nid' => $node->nid));
 
     return db_result($query);
   }
@@ -345,7 +343,7 @@ function premium_user_content_access($node, $account = NULL) {
   // If node is premium, check if user has access to the level specified.
   if ($node->premium) {
     $level = premium_level_load($node->premium);
-    return user_access(_premium_permission_name($level['name']));
+    return user_access(_premium_permission_name($level->name));
   }
 
   // Nobody said we could access the node.
@@ -377,19 +375,19 @@ function _premium_access($node, $teaser) {
 /**
  * Update the premium table with appropriate premium values for a node.
  */
-function _premium_set_premium($node, $level_id = FALSE) {
+function _premium_set_premium($node, $machine_name = FALSE) {
   db_query('DELETE FROM {premium_nodes} WHERE nid = %d', $node->nid);
-  if ($level_id) {
-    $level = premium_level_load($level_id);
+  if ($machine_name) {
+    $level = premium_level_load($machine_name);
 
     $start_ts = $end_ts = 0 ;
-    _premium_offset($node->created, $start_ts, $end_ts, $level['proctection_type'], $level['duration'], $level['duration_unit']);
-    db_query('
-      INSERT INTO {premium_nodes} (nid, level_id, start_ts, end_ts)
-      VALUES ( %d, %d, %d, %d )
-    ', array(
+    _premium_offset($node->created, $start_ts, $end_ts, $level->proctection_type, $level->duration, $level->duration_unit);
+    db_query("
+      INSERT INTO {premium_nodes} (nid, level_name, start_ts, end_ts)
+      VALUES (%d, '%s', %d, %d)
+    ", array(
       ':nid' => $node->nid,
-      ':level_id' => $level['level_id'],
+      ':machine_name' => $level->machine_name,
       ':start' => $start_ts,
       ':end' => $end_ts,
     ));

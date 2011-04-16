@@ -1,3 +1,5 @@
 name = Premium
 description = Restrict access to premium content.
 core = 6.x
+dependencies[] = ctools
+

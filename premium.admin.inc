@@ -27,9 +27,9 @@ function premium_admin_overview_page() {
   $rows = array();
   foreach ($levels as $level) {
     $rows[] = array(
-      $level['name'],
-      l(t('edit'), 'admin/content/premium/' . $level['level_id'] . '/edit'),
-      l(t('delete'), 'admin/content/premium/' . $level['level_id'] . '/delete'),
+      $level->name,
+      l(t('edit'), 'admin/content/premium/' . $level->machine_name . '/edit'),
+      l(t('delete'), 'admin/content/premium/' . $level->machine_name . '/delete'),
     );
   }
 
@@ -52,36 +52,38 @@ function premium_admin_overview_page() {
  * @ingroup forms
  * @see premium_admin_level_edit_form_submit()
  */
-function premium_admin_level_edit_form(&$form_state, $level = array()) {
-  if (!empty($level)) {
-    drupal_set_title(t('Edit level “@name”', array('@name' => $level['name'])));
+function premium_admin_level_edit_form(&$form_state, $level = FALSE) {
+  // If we're editing a level, set the title accordingly.
+  if ($level) {
+    drupal_set_title(t('Edit level “@name”', array('@name' => $level->name)));
   }
-
-  // Merge in default settings when creating a new record.
-  $level += array(
-    'name' => '',
-    'proctection_type' => 'all',
-    'duration' => 2,
-    'duration_unit' => 'W',
-    'denied_message' => t('Full text available to premium subscribers only'),
-    'denied_message_format' => FILTER_FORMAT_DEFAULT,
-  );
+  // If not, provide some default values.
+  else {
+    $level = (object) array(
+      'name' => '',
+      'proctection_type' => 'all',
+      'duration' => 2,
+      'duration_unit' => 'W',
+      'denied_message' => t('Full text available to premium subscribers only'),
+      'denied_message_format' => FILTER_FORMAT_DEFAULT,
+    );
+  }
 
   $form = array();
 
   // If we're editing an existing level, we'll add a value field to the form
   // containing the level's unique ID.
-  if (!empty($level['level_id'])) {
+  if (!empty($level->level_id)) {
     $form['level_id'] = array(
       '#type' => 'value',
-      '#value' => $level['level_id'],
+      '#value' => $level->level_id,
     );
   }
 
   $form['name'] = array(
     '#type' => 'textfield',
     '#title' => t('Name'),
-    '#default_value' => $level['name'],
+    '#default_value' => $level->name,
     '#required' => TRUE,
   );
 
@@ -89,20 +91,20 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
     '#type' => 'textfield', 
     '#title' => t('Machine-readable name'),
     '#description' => t('A unique machine-readable name. Can only contain lowercase letters, numbers, and underscores.'),
-    '#default_value' => $level['machine_name'], 
+    '#default_value' => $level->machine_name, 
     '#maxlength' => 255, 
     '#required' => TRUE,
   );
 
   $form['old_machine_name'] = array(
     '#type' => 'value', 
-    '#value' => $level['machine_name'], 
+    '#value' => $level->machine_name, 
   );
 
   $form['proctection_type'] = array(
     '#type' => 'radios',
     '#title' => t('Protection type'),
-    '#default_value' => $level['proctection_type'],
+    '#default_value' => $level->proctection_type,
     '#options' => array(
       'all' => t('Premium items are permanently restricted'),
       'archive' => t('Protect archives only: Items switch to premium status after a specified period'),
@@ -113,7 +115,7 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
   $form['duration'] = array(
     '#type' => 'select',
     '#title' => t('Protection duration'),
-    '#default_value' => $level['duration'],
+    '#default_value' => $level->duration,
     '#options' => array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8, 9 => 9,
       10 => 10, 11 => 11, 12 => 12, 13 => 13, 14 => 14, 15 => 15),
   );
@@ -121,7 +123,7 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
   $form['duration_unit'] = array(
     '#type' => 'select',
     '#title' => t('Duration unit'),
-    '#default_value' => $level['duration_unit'],
+    '#default_value' => $level->duration_unit,
     '#options' => array(
       'D' => t('Days'),
       'W' => t('Weeks'),
@@ -138,22 +140,22 @@ function premium_admin_level_edit_form(&$form_state, $level = array()) {
 
   $form['denied_message_fieldset']['denied_message'] = array(
     '#type' => 'textarea',
-    '#default_value' => $level['denied_message'],
+    '#default_value' => $level->denied_message,
     '#cols' => 60,
     '#rows' => 6,
     '#description' => t('When a visitor doesn\'t have access to an item at this level they will see this message instead of its full text'),
   );
 
-  $form['denied_message_fieldset']['denied_message_format'] = filter_form($level['denied_message_form'], 1, array('denied_message_format'));
+  $form['denied_message_fieldset']['denied_message_format'] = filter_form($level->denied_message_form, 1, array('denied_message_format'));
 
   $form['buttons']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save premium level'),
   );
 
-  if (!empty($level['level_id'])) {
+  if (!empty($level->level_id)) {
     $form['buttons']['delete'] = array(
-      '#value' => l(t('Delete'), 'admin/content/premium/' . $level['level_id'] . '/delete'),
+      '#value' => l(t('Delete'), 'admin/content/premium/' . $level->machine_name . '/delete'),
     );
   }
 
@@ -185,8 +187,20 @@ function premium_admin_level_edit_form_validate($form_id, &$form_state) {
  * @see premium_admin_level_edit_form_validate()
  */
 function premium_admin_level_edit_form_submit($form_id, &$form_state) {
-  $level = $form_state['values'];
-  premium_level_save($level);
+  $level = (object) $form_state['values'];
+  $change = premium_level_save($level);
+
+  // If machine name changed, update the node tables.
+  if ($change == SAVED_UPDATED && $level->machine_name != $level->old_machine_name) {
+    db_query("
+      UPDATE {premium_nodes}
+      SET level_name = '%s'
+      WHERE level_name = '%s'
+    ", array(
+      ':new' => $level->machine_name,
+      ':old' => $level->old_machine_name
+    ));
+  }
 
   $form_state['redirect'] = 'admin/content/premium';
 }
@@ -206,11 +220,11 @@ function premium_admin_level_delete_form(&$form_state, $level) {
 
   $form['level_id'] = array(
     '#type' => 'value',
-    '#value' => $level['level_id'],
+    '#value' => $level->level_id,
   );
 
   return confirm_form($form,
-    t('Are you sure you want to delete %title?', array('%title' => $level['name'])),
+    t('Are you sure you want to delete %title?', array('%title' => $level->name)),
     isset($_GET['destination']) ? $_GET['destination'] : 'admin/content/premium',
     t('This action cannot be undone.'),
     t('Delete')
@@ -229,7 +243,7 @@ function premium_admin_level_delete_form(&$form_state, $level) {
  */
 function premium_admin_level_delete_form_submit($form, &$form_state) {
   if ($form_state['values']['confirm']) {
-    premium_level_delete($form_state['values']['level_id']);
+    premium_level_delete($form_state['values']['machine_name']);
     drupal_set_message(t('Premium level was deleted.'));
   }
 
