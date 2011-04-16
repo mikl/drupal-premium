@@ -22,11 +22,12 @@ function premium_schema() {
         'unsigned' => TRUE,
         'description' => 'The {node}.nid this record affects.',
       ),
-      'level_id' => array(
-        'description' => 'The {premium_levels}.level_id this record affects.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'unsigned' => TRUE,
+      'level_name' => array(
+        'description' => 'The {premium_levels}.machine_name this node belongs to.',
+        'type' => 'varchar', 
+        'length' => 255, 
+        'not null' => TRUE, 
+        'default' => '', 
       ),
       'start_ts' => array(
         'type' => 'int',
@@ -46,6 +47,21 @@ function premium_schema() {
 
   $schema['premium_levels'] = array(
     'description' => 'Stores premium levels and their settings.',
+    'export' => array(
+      'key' => 'machine_name',
+      'key name' => 'Machine name',
+      'primary key' => 'level_id',
+      'identifier' => 'level', // Exports will be as $level
+      'default hook' => 'default_premium_level',  // Function hook name.
+      'api' => array(
+        'owner' => 'premium',
+        'api' => 'default_premium_levels',  // Base name for api include files.
+        'minimum_version' => 1,
+        'current_version' => 1,
+      ),
+      'load callback' => 'premium_level_load',
+      'save callback' => 'premium_level_save',
+    ),
     'fields' => array(
       'level_id' => array(
         'description' => 'The primary, atomic identifier for a premium level.',
@@ -256,4 +272,38 @@ function premium_update_6001(&$sandbox) {
 
   return $ret;
 }
+
+/**
+ * Update premium_nodes table to use machine name instead of level_id.
+ */
+function premium_update_6002(&$sandbox) {
+  $ret = array();
+
+  // Add the level_name field to the premium_nodes table.
+  db_add_field(&$ret, 'premium_nodes', 'level_name', array(
+    'description' => 'The {premium_levels}.machine_name this record belongs to.',
+    'type' => 'varchar', 
+    'length' => 255, 
+    'not null' => TRUE, 
+    'default' => '', 
+  ));
+
+  // Get all levels IDs and their corresponding level_ids.
+  $query = db_query("SELECT level_id, machine_name FROM {premium_levels}");
+  while ($row = db_fetch_object($query)) {
+    $ret[] = update_sql("
+      UPDATE {premium_nodes}
+      SET level_name = '{$row->machine_name}'
+      WHERE level_id = {$row->level_id}
+    ");
+  }
+
+  // Add an index on the new column.
+  db_add_index(&$ret, 'premium_nodes', 'level_name', array('level_name'));
+
+  return $ret;
+}
+
+// TODO: Remove level_id from premium_nodes in a later update, once 
+// we're sure the CTools-based API is stable.
 
