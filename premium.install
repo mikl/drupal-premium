@@ -52,7 +52,6 @@ function premium_schema() {
       'key name' => 'Machine name',
       'primary key' => 'level_id',
       'identifier' => 'level', // Exports will be as $level
-      'default hook' => 'default_premium_level',  // Function hook name.
       'api' => array(
         'owner' => 'premium',
         'api' => 'default_premium_levels',  // Base name for api include files.
