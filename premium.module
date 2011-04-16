@@ -250,8 +250,8 @@ function premium_level_save(&$level) {
  *   An int containing the ID of a record.
  */
 function premium_level_delete($machine_name) {
-  db_query("DELETE FROM {premium_levels} WHERE machine_name = '%d'", $machine_name);
-  db_query("DELETE FROM {premium_nodes} WHERE level_name = '%d'", $machine_name);
+  db_query("DELETE FROM {premium_levels} WHERE machine_name = '%s'", $machine_name);
+  db_query("DELETE FROM {premium_nodes} WHERE level_name = '%s'", $machine_name);
 }
 
 /**

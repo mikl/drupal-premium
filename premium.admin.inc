@@ -218,9 +218,9 @@ function premium_admin_level_edit_form_submit($form_id, &$form_state) {
 function premium_admin_level_delete_form(&$form_state, $level) {
   $form = array();
 
-  $form['level_id'] = array(
+  $form['machine_name'] = array(
     '#type' => 'value',
-    '#value' => $level->level_id,
+    '#value' => $level->machine_name,
   );
 
   return confirm_form($form,
