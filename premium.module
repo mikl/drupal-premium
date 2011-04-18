@@ -203,7 +203,7 @@ function premium_default_premium_levels() {
   $preset->proctection_type = 'all';
   $preset->duration = 2;
   $preset->duration_unit = 'W';
-  $preset->denied_message = t('Full text available to premium subscribers only');
+  $preset->denied_message = t('Full text available to premium subscribers only.');
   $preset->denied_message_format = FILTER_FORMAT_DEFAULT;
 
   $export['default'] = $preset;
