@@ -54,7 +54,7 @@ function premium_schema() {
       'identifier' => 'level', // Exports will be as $level
       'api' => array(
         'owner' => 'premium',
-        'api' => 'default_premium_levels',  // Base name for api include files.
+        'api' => 'premium_levels',  // Base name for api include files.
         'minimum_version' => 1,
         'current_version' => 1,
       ),

@@ -174,7 +174,7 @@ function premium_form_alter(&$form, $form_state, $form_id) {
  * Implementation of hook_ctools_plugin_api().
  */
 function premium_ctools_plugin_api($owner, $api) {
-  if ($owner == 'premium' && $api == 'default_premium_levels') {
+  if ($owner == 'premium' && $api == 'premium_levels') {
     return array('version' => 1);
   }
 }
@@ -188,6 +188,28 @@ function premium_ctools_plugin_directory($module, $plugin) {
   }
 }
 
+/**
+ * Implementation of hook_default_premium_levels().
+ *
+ * Provide a default Premium level.
+ */
+function premium_default_premium_levels() {
+  $export = array();
+
+  $preset = new stdClass;
+  $preset->api_version = 1;
+  $preset->name = 'Premium content';
+  $preset->machine_name = 'default';
+  $preset->proctection_type = 'all';
+  $preset->duration = 2;
+  $preset->duration_unit = 'W';
+  $preset->denied_message = t('Full text available to premium subscribers only');
+  $preset->denied_message_format = FILTER_FORMAT_DEFAULT;
+
+  $export['default'] = $preset;
+
+  return $export;
+}
 
 /**
  * Load a premium level based on machine name.
