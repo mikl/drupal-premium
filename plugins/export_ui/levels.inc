@@ -21,6 +21,10 @@ $plugin = array(
   'title singular proper' => t('Premium content level'),
   'title plural proper' => t('Premium content levels'),
 
+  'export' => array(
+    'admin_title' => 'name',
+  ),
+
   'form' => array(
     'settings' => 'premium_levels_ctools_export_ui_form',
     'submit' => 'premium_levels_ctools_export_ui_form_submit',
@@ -32,18 +36,6 @@ $plugin = array(
  */
 function premium_levels_ctools_export_ui_form(&$form, &$form_state) {
   $level = $form_state['item'];
-
-  $form['name'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Name'),
-    '#default_value' => $level->name,
-    '#required' => TRUE,
-  );
-
-  $form['old_machine_name'] = array(
-    '#type' => 'value', 
-    '#value' => $level->machine_name, 
-  );
 
   $form['proctection_type'] = array(
     '#type' => 'radios',
