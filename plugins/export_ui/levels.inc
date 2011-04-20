@@ -41,6 +41,9 @@ $plugin = array(
 function premium_levels_ctools_export_ui_form(&$form, &$form_state) {
   $level = $form_state['item'];
 
+  // We require a title, since it's used in select boxes in forms, etc.
+  $form['info']['name']['#required'] = TRUE;
+
   $form['proctection_type'] = array(
     '#type' => 'radios',
     '#title' => t('Protection type'),
