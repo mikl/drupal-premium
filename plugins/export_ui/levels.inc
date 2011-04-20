@@ -27,7 +27,6 @@ $plugin = array(
 
   'form' => array(
     'settings' => 'premium_levels_ctools_export_ui_form',
-    'submit' => 'premium_levels_ctools_export_ui_form_submit',
   ),
 );
 
