@@ -304,6 +304,14 @@ function premium_update_6002(&$sandbox) {
   return $ret;
 }
 
-// TODO: Remove level_id from premium_nodes in a later update, once 
-// we're sure the CTools-based API is stable.
+/**
+ * Remove the level_id from premium_nodes.
+ */
+function premium_update_6003(&$sandbox) {
+  $ret = array();
+
+  db_drop_field($ret, 'premium_nodes', 'level_id');
+
+  return $ret;
+}
 
