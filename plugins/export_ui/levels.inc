@@ -28,6 +28,11 @@ $plugin = array(
   'form' => array(
     'settings' => 'premium_levels_ctools_export_ui_form',
   ),
+
+  'handler' => array(
+    'class' => 'levels_export_ui',
+    'parent' => 'ctools_export_ui',
+  ),
 );
 
 /**
