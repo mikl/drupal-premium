@@ -67,6 +67,7 @@ function premium_schema() {
         'type' => 'serial',
         'not null' => TRUE,
         'unsigned' => TRUE,
+        'no export' => TRUE, // Do not export database-only keys.
       ),
       'name' => array(
         'description' => 'The name of this level, always treated as non-markup plain text.',
