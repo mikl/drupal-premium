@@ -194,7 +194,10 @@ function premium_level_option_list() {
   $levels = array();
 
   foreach (premium_level_load_all() as $machine_name => $level) {
-    $levels[$machine_name] = $level->name;
+    // Only return enabled levels. 
+    if (!$level->disabled) {
+      $levels[$machine_name] = $level->name;
+    }
   }
 
   return $levels;
