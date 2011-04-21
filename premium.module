@@ -82,8 +82,14 @@ function premium_node_operations() {
  * Callback for hook_node_operations()
  */
 function _premium_node_operations_premium($nids, $machine_name = FALSE) {
-  foreach ($nids as $nid) {
-    $node = node_load($nid);
+  // Get the node data used by _premium_set_premium.
+  $query = db_query('
+    SELECT nid, created FROM {node}
+    WHERE nid IN (' . implode(',', $nids) . ')
+  ');
+
+  // Set the premium level for each node.
+  while ($node = db_fetch_object($query)) {
     _premium_set_premium($node, $machine_name);
   }
 }
@@ -198,7 +204,7 @@ function premium_level_option_list() {
   $levels = array();
 
   foreach (premium_level_load_all() as $machine_name => $level) {
-    // Only return enabled levels. 
+    // Only return enabled levels.
     if (!$level->disabled) {
       $levels[$machine_name] = $level->name;
     }
@@ -355,7 +361,7 @@ function _premium_access($node, $teaser) {
  * Update the premium table with appropriate premium values for a node.
  *
  * @param $node
- *   The node to set status for. Only nid and created attributes are 
+ *   The node to set status for. Only nid and created attributes are
  *   used, so a full node object is not required.
  * @param $machine_name
  *   Machine name of the premium level we want to set.
