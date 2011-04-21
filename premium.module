@@ -349,14 +349,26 @@ function _premium_access($node, $teaser) {
 
 /**
  * Update the premium table with appropriate premium values for a node.
+ *
+ * @param $node
+ *   The node to set status for. Only nid and created attributes are 
+ *   used, so a full node object is not required.
+ * @param $machine_name
+ *   Machine name of the premium level we want to set.
  */
 function _premium_set_premium($node, $machine_name = FALSE) {
+  // First, delete the current premium status, if any.
   db_query('DELETE FROM {premium_nodes} WHERE nid = %d', $node->nid);
+
+  // Then load the level if a machine name was passed.
   if ($machine_name) {
     $level = premium_level_load($machine_name);
 
+    // Calculate the premium offset based on the level.
     $start_ts = $end_ts = 0 ;
     _premium_offset($node->created, $start_ts, $end_ts, $level->proctection_type, $level->duration, $level->duration_unit);
+
+    // And insert the whole deal into the database.
     db_query("
       INSERT INTO {premium_nodes} (nid, level_name, start_ts, end_ts)
       VALUES (%d, '%s', %d, %d)
