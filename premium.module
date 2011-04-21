@@ -59,28 +59,32 @@ function premium_nodeapi(&$node, $op, $teaser) {
  * Implementation of hook_node_operations().
  */
 function premium_node_operations() {
-  $operations = array(
-    'premium' => array(
-      'label' => t('Set premium status'),
+  $operations = array();
+
+  foreach (premium_level_option_list() as $machine_name => $title) {
+    $operations['premium_' . $machine_name] = array(
+      'label' => t('Set premium status: @level', array('@level' => $title)),
       'callback' => '_premium_node_operations_premium',
-      'callback arguments' => array(1),
-    ),
-    'unpremium' => array(
-      'label' => t('Remove premium status'),
-      'callback' => '_premium_node_operations_premium',
-      'callback arguments' => array(0),
-    ),
+      'callback arguments' => array($machine_name),
+    );
+  }
+
+  $operations['unpremium'] = array(
+    'label' => t('Remove premium status'),
+    'callback' => '_premium_node_operations_premium',
+    'callback arguments' => array(FALSE),
   );
+
   return $operations;
 }
 
 /**
  * Callback for hook_node_operations()
  */
-function _premium_node_operations_premium($nids, $premium = 0) {
+function _premium_node_operations_premium($nids, $machine_name = FALSE) {
   foreach ($nids as $nid) {
     $node = node_load($nid);
-    _premium_set_premium($node, $premium);
+    _premium_set_premium($node, $machine_name);
   }
 }
 
