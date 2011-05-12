@@ -42,7 +42,7 @@ function premium_schema() {
         'description' => 'Unix timestamp for when premium status ends.',
       ),
     ),
-    'primary key' => array('nid', 'level_id'),
+    'primary key' => array('nid', 'level_name'),
   );
 
   $schema['premium_levels'] = array(
