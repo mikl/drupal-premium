@@ -225,7 +225,7 @@ function premium_update_6000(&$sandbox) {
   variable_del('premium_format');
 
   // Add the level_id field to the premium_nodes table.
-  db_add_field(&$ret, 'premium_nodes', 'level_id', array(
+  db_add_field($ret, 'premium_nodes', 'level_id', array(
     'description' => 'The {premium_levels}.level_id this record affects.',
     'type' => 'int',
     'not null' => TRUE,
@@ -251,7 +251,7 @@ function premium_update_6001(&$sandbox) {
   $ret = array();
 
   // Add the machine_name field to the premium_levels table.
-  db_add_field(&$ret, 'premium_levels', 'machine_name', array(
+  db_add_field($ret, 'premium_levels', 'machine_name', array(
     'type' => 'varchar', 
     'length' => 255, 
     'not null' => TRUE, 
@@ -273,7 +273,7 @@ function premium_update_6001(&$sandbox) {
 
   // Add unique key index on the machine_name, as they are supposed to 
   // be unique for export.
-  db_add_unique_key(&$ret, 'premium_levels', 'machine_name', array('machine_name'));
+  db_add_unique_key($ret, 'premium_levels', 'machine_name', array('machine_name'));
 
   return $ret;
 }
@@ -285,7 +285,7 @@ function premium_update_6002(&$sandbox) {
   $ret = array();
 
   // Add the level_name field to the premium_nodes table.
-  db_add_field(&$ret, 'premium_nodes', 'level_name', array(
+  db_add_field($ret, 'premium_nodes', 'level_name', array(
     'description' => 'The {premium_levels}.machine_name this record belongs to.',
     'type' => 'varchar', 
     'length' => 255, 
@@ -304,7 +304,7 @@ function premium_update_6002(&$sandbox) {
   }
 
   // Add an index on the new column.
-  db_add_index(&$ret, 'premium_nodes', 'level_name', array('level_name'));
+  db_add_index($ret, 'premium_nodes', 'level_name', array('level_name'));
 
   return $ret;
 }

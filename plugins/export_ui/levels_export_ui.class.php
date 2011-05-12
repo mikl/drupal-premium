@@ -5,7 +5,7 @@
  */
 class levels_export_ui extends ctools_export_ui {
   function list_form(&$form, &$form_state) {
-    parent::list_form($form, &$form_state);
+    parent::list_form($form, $form_state);
     // This is perhaps a bit brutal, but I don't think that any sites 
     // will have enough premium levels to warrant the very fancy 
     // filtering interface CTools provide by default. If you really need 
