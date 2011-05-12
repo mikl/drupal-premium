@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ * Installation and upgrading code for Premium Content module.
+ */
 
 /**
  * Implementation of hook_install().
@@ -115,6 +119,7 @@ function premium_schema() {
       ),
     ),
     'primary key' => array('level_id'),
+    'unique keys' => array('machine_name' => array('machine_name')),
   );
 
   return $schema;
